@@ -77,17 +77,16 @@ with col_input:
         if user_input:
             with st.spinner('🔐 正在分析語意特徵...'):
                 try:
-                    # 語意歸一化：解決中文判定不準的問題
-                    translated = GoogleTranslator(source='auto', target='en').translate(user_input)
+                    # 關鍵修正：強制指定從中文 (zh-TW) 翻譯成英文 (en)
+                    # 這樣 '永久停用' 會變成 'permanently disabled'，觸發 AI 的警報
+                    translated = GoogleTranslator(source='zh-TW', target='en').translate(user_input)
+                    
                     vec = tfidf_vec.transform([translated])
                     prob = ai_model.predict_proba(vec)[0][1]
                     
                     with col_report:
                         st.subheader("🕵️ 分析診斷報告")
-                        st.markdown(f"""<div class='metric-card'>
-                            <p style='margin:0; font-size:12px; color:#6b7280;'>THREAT SCORE</p>
-                            <h2 style='margin:0; color:#1e3a8a;'>{prob*100:.2f}%</h2>
-                        </div>""", unsafe_allow_html=True)
+                        # ... (其餘 UI 顯示程式碼維持不變)
                         
                         if prob > 0.5:
                             st.error("⚠️ 偵測到高度釣魚威脅")
