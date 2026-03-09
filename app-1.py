@@ -73,41 +73,45 @@ with col_input:
     st.subheader("📥 待測郵件掃描")
     user_input = st.text_area("請在此貼入郵件本文：", height=380, placeholder="等待輸入內容...")
     
-    if st.button("🚀 執行深度威脅掃描"):
+    if st.button("🚀 啟動 AI 威脅深度掃描"):
         if user_input:
-            with st.spinner('🔐 正在分析語意特徵與行為模式...'):
+            with st.spinner('🔐 執行語意歸一化與行為模式比對...'):
                 try:
-                    # 1. 執行語意歸一化
+                    # 1. 語意歸一化處理
                     translated = GoogleTranslator(source='auto', target='en').translate(user_input)
                     
-                    # 2. 進階特徵偵測 (大學生水準的額外邏輯)
-                    has_short_url = any(x in user_input for x in ['bit.ly', 'tinyurl', 't.co'])
-                    urgency_words = ['urgent', 'immediately', 'permanently', 'verify', 'disabled']
-                    found_words = [word for word in urgency_words if word in translated.lower()]
+                    # 2. 行為特徵提取 (UBA Analysis) - 讓報告專業的關鍵
+                    # 偵測縮網址
+                    short_urls = ['bit.ly', 'tinyurl', 't.co', 'goo.gl', 'reurl']
+                    has_short_url = any(url in user_input.lower() for url in short_urls)
                     
-                    # 3. AI 預測
+                    # 偵測高危險誘導動詞
+                    danger_keywords = ['verify', 'urgently', 'permanently', 'disabled', 'suspended', 'immediately']
+                    found_keywords = [word for word in danger_keywords if word in translated.lower()]
+                    
+                    # 3. AI 模型預測
                     vec = tfidf_vec.transform([translated])
                     prob = ai_model.predict_proba(vec)[0][1]
                     
-                    # 4. 專業顯示區塊
                     with col_report:
                         st.subheader("🕵️ 資安診斷報告")
-                        st.metric("威脅評分", f"{prob*100:.2f}%", delta="⚠️ 高危" if prob > 0.5 else "✅ 安全")
+                        # 顯示風險機率卡片
+                        st.metric("威脅評分 (Threat Score)", f"{prob*100:.2f}%", delta="⚠️ 高危" if prob > 0.5 else "✅ 安全")
                         
-                        # 展示行為特徵 (這就是專業感！)
+                        # 填充行為特徵提取區塊
                         st.write("### 🔍 行為特徵提取 (UBA Analysis)")
-                        col_a, col_b = st.columns(2)
-                        col_a.markdown(f"**縮網址偵測：** {'🔴 異常' if has_short_url else '🟢 無'}")
-                        col_b.markdown(f"**誘導詞數量：** {len(found_words)}")
+                        c1, c2 = st.columns(2)
+                        c1.markdown(f"**縮網址偵測：** {'🔴 異常' if has_short_url else '🟢 無'}")
+                        c2.markdown(f"**誘導詞數量：** {len(found_keywords)}")
                         
-                        if found_words:
-                            st.warning(f"偵測到高危攻擊行為：{', '.join(found_words)}")
+                        if found_keywords:
+                            st.warning(f"偵測到攻擊特徵詞：{', '.join(found_keywords)}")
                         
                         st.write("---")
                         with st.expander("📝 檢視跨語言語意正規化 (Normalization)"):
                             st.info(translated)
                 except Exception as e:
-                    st.error(f"掃描失敗: {e}")
+                    st.error(f"系統偵測中斷: {e}")
         else:
             st.warning("請輸入內容。")
 
