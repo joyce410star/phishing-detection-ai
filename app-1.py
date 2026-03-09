@@ -97,53 +97,55 @@ with col_input:
     
     if st.button("🚀 啟動 AI 威脅深度掃描"):
         if user_input:
-            with st.spinner('🔐 執行語意歸一化與行為模式比對...'):
+            with st.spinner('🔐 執行語意正規化與惡意模式比對...'):
                 try:
-                    # 強制執行語意歸一化：將輸入轉為模型熟悉的英文特徵
-                    translated = GoogleTranslator(source='auto', target='en').translate(user_input)
+                    # 1. 語意正規化 (解決跨語言偵測難題)
+                    translated = GoogleTranslator(source='auto', target='en').translate(user_input).lower()
                     
-                    # 專業行為特徵提取 (UBA Analysis)
-                    # 偵測高危連結行為
+                    # 2. 偵測特定惡意模式 (Detected suspicious patterns)
+                    # 定義你要求的專業偵測清單
+                    patterns = {
+                        "Urgency (急迫性誘導)": ["urgent", "immediately", "final warning", "within 2 hours"],
+                        "Credential Harvesting (憑證釣魚)": ["verify account", "security credentials", "login", "password"],
+                        "Call to Action (引導點擊)": ["click here", "update-now", "access link", "follow the link"]
+                    }
+                    
+                    detected_patterns = []
+                    for category, keywords in patterns.items():
+                        for word in keywords:
+                            if word in translated:
+                                detected_patterns.append(f"🎯 {category}: `{word}`")
+                    
+                    # 3. 縮網址偵測邏輯
                     short_urls = ['bit.ly', 'tinyurl', 't.co', 'goo.gl', 'reurl', 'sec-login', '.xyz']
                     has_short_url = any(url in user_input.lower() for url in short_urls)
                     
-                    # 偵測誘導性動詞 (根據 8 萬筆樣本提取的關鍵特徵)
-                    danger_keywords = ['verify', 'urgently', 'permanently', 'disabled', 'suspended', 'immediately', 'expired', 'warning']
-                    found_words = [word for word in danger_keywords if word in translated.lower()]
-                    
-                    # AI 模型預測風險百分比
+                    # 4. AI 預測
                     vec = tfidf_vec.transform([translated])
                     prob = ai_model.predict_proba(vec)[0][1]
                     
                     with col_report:
                         st.subheader("🕵️ 資安診斷報告")
+                        st.metric("威脅評分", f"{prob*100:.2f}%", delta="⚠️ 高危" if prob > 0.5 else "✅ 安全")
                         
-                        # 顯示威脅評分卡片
-                        st.metric(
-                            "威脅評分 (Threat Score)", 
-                            f"{prob*100:.2f}%", 
-                            delta="⚠️ 高危" if prob > 0.7 else ("🟡 中風險" if prob > 0.4 else "✅ 安全"),
-                            delta_color="normal" if prob > 0.4 else "inverse"
-                        )
+                        # --- 專業版報告區塊 ---
+                        st.write("### 🚨 Detected Suspicious Patterns")
+                        if detected_patterns:
+                            for p in detected_patterns:
+                                st.write(p)
+                        else:
+                            st.write("🟢 未發現顯著語意威脅模式")
                         
-                        # 連動行為分析數據區塊
-                        st.write("### 🔍 行為特徵提取 (UBA Analysis)")
-                        c1, c2 = st.columns(2)
-                        with c1:
-                            st.markdown(f"**縮網址偵測：** {'🔴 異常' if has_short_url else '🟢 無'}")
-                        with c2:
-                            st.markdown(f"**誘導詞數量：** {len(found_words)}")
-                        
-                        if found_words:
-                            st.warning(f"偵測到高危特徵詞：{', '.join(found_words)}")
-
-                        # 找回翻譯內文區塊，實現 Explainable AI
                         st.write("---")
-                        with st.expander("📝 檢視跨語言語意正規化 (Normalization)", expanded=True):
+                        st.write("### 🔍 行為特徵提取 (UBA Analysis)")
+                        st.markdown(f"**縮網址偵測：** {'🔴 異常' if has_short_url else '🟢 無'}")
+                        st.markdown(f"**誘導詞命中總數：** {len(detected_patterns)}")
+                        
+                        with st.expander("📝 檢視語意處理結果 (Explainable AI)"):
                             st.info(translated)
                             
                 except Exception as e:
-                    st.error(f"偵測失敗: {e}")
+                    st.error(f"偵測異常: {e}")
         else:
             st.warning("請先輸入郵件內容。")
 
