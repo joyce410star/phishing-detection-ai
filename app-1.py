@@ -50,17 +50,39 @@ with st.sidebar:
     st.info("系統透過 TF-IDF 演算法自動提取連結與關鍵動詞之權重。")
 
 # 4. 模型載入函式：修正縮排與路徑問題
+# 修正後的模型載入函式
 @st.cache_resource
 def load_and_train():
-    # 使用相對路徑以支援雲端部署
-    df = pd.read_csv('phishing_small.csv').dropna(subset=['text_combined'])
-    df_sample = df.sample(15000, random_state=42)
-    tfidf = TfidfVectorizer(stop_words='english', max_features=3000)
-    X = tfidf.fit_transform(df_sample['text_combined'].astype(str))
-    model = MultinomialNB()
-    model.fit(X, df_sample['label'])
-    return tfidf, model
+    try:
+        # 1. 檢查檔案是否存在
+        if not os.path.exists('phishing_small.csv'):
+            st.error("❌ 找不到數據集檔案 phishing_small.csv，請確認已上傳至 GitHub。")
+            st.stop()
+            
+        # 2. 嘗試讀取數據
+        df = pd.read_csv('phishing_small.csv').dropna(subset=['text_combined'])
+        
+        # 檢查檔案是否為空
+        if df.empty:
+            st.error("❌ 檔案內容為空 (EmptyDataError)，請重新上傳正確的數據集。")
+            st.stop()
+            
+        # 3. 執行抽樣與訓練
+        df_sample = df.sample(min(15000, len(df)), random_state=42)
+        tfidf = TfidfVectorizer(stop_words='english', max_features=3000)
+        X = tfidf.fit_transform(df_sample['text_combined'].astype(str))
+        model = MultinomialNB()
+        model.fit(X, df_sample['label'])
+        return tfidf, model
+        
+    except pd.errors.EmptyDataError:
+        st.error("❌ 數據集檔案損毀或無內容，請檢查 GitHub 上的檔案。")
+        st.stop()
+    except Exception as e:
+        st.error(f"❌ 系統初始化失敗: {e}")
+        st.stop()
 
+# 執行載入
 tfidf_vec, ai_model = load_and_train()
 
 # 5. 主頁面佈局
