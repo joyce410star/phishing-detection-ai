@@ -5,7 +5,6 @@ from sklearn.naive_bayes import MultinomialNB
 from deep_translator import GoogleTranslator
 import os
 import re
-import io
 
 # 1. 頁面配置
 st.set_page_config(page_title="AI Phishing Guard Pro", layout="wide", page_icon="🛡️")
@@ -22,12 +21,18 @@ st.markdown("""
     }
     .info-label { color: #6b7280; font-size: 0.85rem; font-weight: 600; }
     .info-value { color: #1e3a8a; font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
-    .batch-result { padding: 10px; border-radius: 5px; margin-bottom: 5px; font-family: monospace; }
+    .structure-box {
+        background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:15px; color:#1f2937;
+    }
+    .batch-item {
+        padding: 12px; border-radius: 8px; margin-bottom: 8px; 
+        font-family: 'Courier New', Courier, monospace; border: 1px solid #e2e8f0;
+    }
     h1, h2, h3 { color: #1e3a8a !important; font-weight: 700 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 側邊欄：Model Information
+# 3. 側邊欄：Model Information & UBA
 with st.sidebar:
     st.markdown("## ⚙️ Model Information")
     st.markdown("""
@@ -42,11 +47,15 @@ with st.sidebar:
         <div class="info-value">92%</div>
     </div>
     """, unsafe_allow_html=True)
+    
     st.write("---")
-    if os.path.exists('analysis_result.png'):
-        st.image('analysis_result.png', caption="行為基線比對圖", use_container_width=True)
+    st.markdown("### 🔍 惡意行為特徵 (UBA)")
+    img_path = 'analysis_result.png'
+    if os.path.exists(img_path):
+        st.image(img_path, caption="行為基線比對圖", use_container_width=True)
+    st.info("系統基於大數據特徵權重進行行為診斷。")
 
-# 4. 模型載入
+# 4. 模型載入與防錯機制
 @st.cache_resource
 def load_and_train():
     try:
@@ -62,63 +71,91 @@ def load_and_train():
 
 tfidf_vec, ai_model = load_and_train()
 
-# 5. 主分頁設計
+# 5. 主分頁架構
 st.title("🛡️ 智慧資安：跨語言釣魚郵件 AI 偵測系統")
-tab1, tab2 = st.tabs(["🔍 單封深度掃描", "📂 CSV 批次分析"])
+tab_single, tab_batch = st.tabs(["🔍 單封深度掃描", "📂 CSV 批次分析"])
 
-# --- TAB 1: 單封掃描 ---
-with tab1:
+# --- 單封深度掃描分頁 ---
+with tab_single:
     col_input, col_report = st.columns([1.2, 1])
-    with col_input:
-        st.subheader("📥 郵件結構分析")
-        user_input = st.text_area("貼入郵件本文：", height=300, key="single_input")
-        if st.button("🚀 啟動掃描", key="single_btn"):
-            if user_input and ai_model:
-                translated = GoogleTranslator(source='auto', target='en').translate(user_input)
-                links = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', user_input)
-                vec = tfidf_vec.transform([translated])
-                prob = ai_model.predict_proba(vec)[0][1]
-                
-                with col_report:
-                    st.subheader("🕵️ 診斷報告")
-                    st.metric("威脅評分", f"{prob*100:.2f}%", delta="⚠️ 高危" if prob > 0.7 else "✅ 安全")
-                    st.markdown(f"**🔗 連結偵測:** {len(links)} 筆")
-                    st.write("---")
-                    st.info(f"正規化語意：{translated[:100]}...")
-            else: st.warning("請輸入內容。")
+    
+    if 'scan_result' not in st.session_state:
+        st.session_state.scan_result = None
 
-# --- TAB 2: CSV 批次分析 (專題亮點功能) ---
-with tab2:
-    st.subheader("📂 批量威脅鑑定 (Batch Processing)")
-    st.write("請上傳包含郵件內容的 CSV 檔案（欄位名稱請設為 `text`）")
-    
-    uploaded_file = st.file_uploader("選擇 CSV 檔案", type="csv")
-    
-    if uploaded_file is not None:
-        df_batch = pd.read_csv(uploaded_file)
-        if 'text' in df_batch.columns:
-            if st.button("🛠️ 開始執行批次分析"):
-                with st.spinner('正在分析大量郵件中...'):
-                    results = []
-                    # 進行批次預測
-                    texts = df_batch['text'].astype(str).tolist()
-                    # 為了速度，批次模式下僅針對前 10 封展示詳細結果
-                    for i, txt in enumerate(texts[:15]):
-                        # 簡單的翻譯與預測邏輯
-                        vec = tfidf_vec.transform([txt])
-                        prob = ai_model.predict_proba(vec)[0][1]
-                        label = "🚨 Phishing" if prob > 0.5 else "✅ Safe"
-                        color = "#fee2e2" if prob > 0.5 else "#dcfce7"
-                        
-                        st.markdown(f"""
-                        <div class="batch-result" style="background:{color}; border-left: 5px solid {'#ef4444' if prob > 0.5 else '#22c55e'}">
-                            <b>Email {i+1}</b> → {label} <span style='float:right; color:#6b7280;'>Score: {prob*100:.1f}%</span>
-                        </div>
-                        """, unsafe_allow_html=True)
+    with col_input:
+        st.subheader("📥 待測郵件掃描 (Email Structure Analysis)")
+        user_input = st.text_area("請在此貼入郵件本文：", height=380, placeholder="Waiting for input...", key="single_text")
+        
+        if st.button("🚀 啟動深度威脅分析"):
+            if user_input and ai_model:
+                with st.spinner('🔐 執行語意正規化與結構分析...'):
+                    translated = GoogleTranslator(source='auto', target='en').translate(user_input)
+                    t_lower = translated.lower()
+                    links = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', user_input)
+                    urgency_words = ["urgent", "immediately", "final warning", "expired", "action required"]
+                    urgency_hits = [w for w in urgency_words if w in t_lower]
+                    finance_words = ["verify account", "bank", "payment", "login", "security credentials"]
+                    finance_hits = [w for w in finance_words if w in t_lower]
+                    vec = tfidf_vec.transform([translated])
+                    prob = ai_model.predict_proba(vec)[0][1]
                     
-                    if len(texts) > 15:
-                        st.write(f"...以及其餘 {len(texts)-15} 封郵件。")
-                        
-                    st.success(f"✅ 批次處理完成！共分析 {len(texts)} 封郵件。")
+                    st.session_state.scan_result = {
+                        "score": prob * 100, "links_count": len(links), "links_list": links[:2],
+                        "urgency": urgency_hits, "finance": finance_hits, "translated": translated
+                    }
+
+    with col_report:
+        if st.session_state.scan_result:
+            res = st.session_state.scan_result
+            st.subheader("🕵️ 資安診斷報告")
+            st.metric("威脅評分", f"{res['score']:.2f}%", delta="⚠️ 高危" if res['score'] > 70 else "✅ 安全")
+            st.write("### 🏗️ Email Structure Analysis")
+            st.markdown(f"""<div class="structure-box"><b>🔗 Links Detected:</b> {res['links_count']} 筆<br><b>⚡ Urgency:</b> {"🔴 偵測到急迫誘導" if res['urgency'] else "🟢 正常"}<br><b>💰 Financial:</b> {"🔴 涉及帳據請求" if res['finance'] else "🟢 無相關描述"}</div>""", unsafe_allow_html=True)
+            st.write("---")
+            st.write("### 🚨 Detected Suspicious Patterns")
+            all_hits = res['urgency'] + res['finance']
+            if all_hits: st.warning(f"命中特徵：{', '.join(list(set(all_hits)))}")
+            else: st.success("未發現顯著語意攻擊特徵。")
         else:
-            st.error("CSV 檔案中找不到名為 `text` 的欄位。")
+            st.write("---")
+            st.markdown("### 📖 系統操作說明")
+            st.write("1. **貼入本文**：支援跨語言內容。")
+            st.write("2. **深度分析**：執行語義歸一化與結構解析。")
+            st.info("💡 提示：貼入內容後點擊左側按鈕即可啟動掃描。")
+
+# --- CSV 批次分析分頁 (新功能) ---
+with tab_batch:
+    st.subheader("📂 批量威脅鑑定中心 (Batch Processing Engine)")
+    st.write("請上傳包含郵件內容的 CSV 檔案，系統將自動進行大規模威脅比對。")
+    
+    uploaded_file = st.file_uploader("選擇上傳 CSV 檔案", type="csv")
+    
+    if uploaded_file:
+        df_batch = pd.read_csv(uploaded_file)
+        # 尋找 CSV 中可能的文字欄位
+        text_col = st.selectbox("請選擇包含郵件本文的欄位名稱 (Column)：", df_batch.columns)
+        
+        if st.button("🛠️ 開始執行大規模批次掃描"):
+            with st.spinner('AI 正在處理批量封包數據中...'):
+                texts = df_batch[text_col].astype(str).tolist()
+                results = []
+                
+                # 批次處理邏輯
+                for i, txt in enumerate(texts[:15]): # Demo 時展示前 15 筆
+                    vec = tfidf_vec.transform([txt])
+                    prob = ai_model.predict_proba(vec)[0][1]
+                    is_phishing = prob > 0.5
+                    label = "🚨 PHISHING" if is_phishing else "✅ SAFE"
+                    bg_color = "#fee2e2" if is_phishing else "#dcfce7"
+                    border_color = "#ef4444" if is_phishing else "#22c55e"
+                    
+                    st.markdown(f"""
+                    <div class="batch-item" style="background:{bg_color}; border-left: 6px solid {border_color}">
+                        <b>Email #{i+1:02d}</b> <span style="margin: 0 15px;">→</span> <b>{label}</b>
+                        <span style="float:right; color:#4b5563;">威脅評分: {prob*100:.1f}%</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                if len(texts) > 15:
+                    st.info(f"💡 本次共處理 {len(texts)} 筆數據，以上僅展示前 15 筆關鍵樣本。")
+                st.success(f"✅ 批次掃描任務完成！偵測母體：{len(texts)} 封郵件。")
