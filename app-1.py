@@ -6,7 +6,7 @@ from deep_translator import GoogleTranslator
 import os
 import re
 
-# 1. 頁面配置
+# 1. 頁面配置：專業戰情室佈局
 st.set_page_config(page_title="AI Phishing Guard Pro", layout="wide", page_icon="🛡️")
 
 # 2. 專業 CSS 樣式
@@ -21,11 +21,14 @@ st.markdown("""
     }
     .info-label { color: #6b7280; font-size: 0.85rem; font-weight: 600; }
     .info-value { color: #1e3a8a; font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
+    .structure-box {
+        background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:15px; color:#1f2937;
+    }
     h1, h2, h3 { color: #1e3a8a !important; font-weight: 700 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 側邊欄：Model Information
+# 3. 側邊欄：Model Information & UBA
 with st.sidebar:
     st.markdown("## ⚙️ Model Information")
     st.markdown("""
@@ -48,11 +51,12 @@ with st.sidebar:
         st.image(img_path, caption="行為基線比對圖", use_container_width=True)
     st.info("系統基於大數據特徵權重進行行為診斷。")
 
-# 4. 模型載入
+# 4. 模型載入與防錯機制
 @st.cache_resource
 def load_and_train():
     try:
-        if not os.path.exists('phishing_small.csv'): return None, None
+        if not os.path.exists('phishing_small.csv'):
+            return None, None
         df = pd.read_csv('phishing_small.csv').dropna(subset=['text_combined'])
         df_sample = df.sample(min(15000, len(df)), random_state=42)
         tfidf = TfidfVectorizer(stop_words='english', max_features=3000)
@@ -60,7 +64,8 @@ def load_and_train():
         model = MultinomialNB()
         model.fit(X, df_sample['label'])
         return tfidf, model
-    except: return None, None
+    except:
+        return None, None
 
 tfidf_vec, ai_model = load_and_train()
 
@@ -68,22 +73,26 @@ tfidf_vec, ai_model = load_and_train()
 st.title("🛡️ 智慧資安：跨語言釣魚郵件 AI 偵測系統")
 col_input, col_report = st.columns([1.2, 1])
 
+# 初始化 Session State 用來存放掃描結果，確保跨組件顯示
+if 'scan_result' not in st.session_state:
+    st.session_state.scan_result = None
+
 with col_input:
     st.subheader("📥 待測郵件掃描 (Email Structure Analysis)")
     user_input = st.text_area("請在此貼入郵件本文：", height=400, placeholder="Waiting for input...")
-    
-    # 初始化一個變數來存放掃描結果
-    result_data = None
     
     if st.button("🚀 啟動深度威脅分析"):
         if user_input and ai_model:
             with st.spinner('🔐 執行語意正規化與結構分析...'):
                 try:
-                    # A. 正規化與結構解析
+                    # A. 執行正規化與特徵提取
                     translated = GoogleTranslator(source='auto', target='en').translate(user_input)
                     t_lower = translated.lower()
+                    
+                    # 偵測連結
                     links = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', user_input)
                     
+                    # 偵測模式
                     urgency_words = ["urgent", "immediately", "final warning", "expired", "action required"]
                     urgency_hits = [w for w in urgency_words if w in t_lower]
                     finance_words = ["verify account", "bank", "payment", "login", "security credentials"]
@@ -93,10 +102,11 @@ with col_input:
                     vec = tfidf_vec.transform([translated])
                     prob = ai_model.predict_proba(vec)[0][1]
                     
-                    # 將結果存入變數，以便在右側顯示
-                    result_data = {
-                        "prob": prob,
-                        "links": links,
+                    # 將結果存入 session_state
+                    st.session_state.scan_result = {
+                        "score": prob * 100,
+                        "links_count": len(links),
+                        "links_list": links[:2],
                         "urgency": urgency_hits,
                         "finance": finance_hits,
                         "translated": translated
@@ -106,38 +116,49 @@ with col_input:
         else:
             st.warning("請輸入內容並確保數據集已備妥。")
 
-# 6. 右側報告與說明邏輯切換
+# 6. 右側報告邏輯：當有結果時顯示診斷報告，否則顯示操作說明
 with col_report:
-    if result_data:
-        # 當有結果時，顯示專業診斷報告
+    if st.session_state.scan_result:
+        res = st.session_state.scan_result
         st.subheader("🕵️ 資安診斷報告")
-        prob = result_data["prob"]
-        st.metric("威脅評分 (Threat Score)", f"{prob*100:.2f}%", delta="⚠️ 高危" if prob > 0.7 else "✅ 安全")
         
+        # 威脅評分
+        st.metric("威脅評分 (Threat Score)", f"{res['score']:.2f}%", 
+                  delta="⚠️ 高危" if res['score'] > 70 else "✅ 安全")
+        
+        # Email 結構分析
         st.write("### 🏗️ Email Structure Analysis")
         st.markdown(f"""
-        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:15px;">
-            <b>🔗 Links Detected:</b> {len(result_data['links'])} 筆<br>
-            <b>⚡ Urgency Language:</b> {"🔴 偵測到急迫誘導" if result_data['urgency'] else "🟢 正常"}<br>
-            <b>💰 Financial Request:</b> {"🔴 涉及帳據請求" if result_data['finance'] else "🟢 無相關描述"}
+        <div class="structure-box">
+            <b>🔗 Links Detected:</b> {res['links_count']} 筆<br>
+            <b>⚡ Urgency Language:</b> {"🔴 偵測到急迫誘導" if res['urgency'] else "🟢 正常"}<br>
+            <b>💰 Financial Request:</b> {"🔴 涉及帳據請求" if res['finance'] else "🟢 無相關描述"}
         </div>
         """, unsafe_allow_html=True)
         
+        # 顯示連結取證 (新功能)
+        if res['links_list']:
+            st.caption("偵測到之可疑路徑：")
+            for link in res['links_list']: st.code(link, language="text")
+
         st.write("---")
+        # 惡意模式匹配
         st.write("### 🚨 Detected Suspicious Patterns")
-        all_hits = result_data['urgency'] + result_data['finance']
+        all_hits = res['urgency'] + res['finance']
         if all_hits:
             st.warning(f"命中特徵：{', '.join(list(set(all_hits)))}")
         else:
             st.success("未發現顯著語意攻擊特徵。")
 
-        with st.expander("📝 檢視跨語言語意正規化分析結果"):
-            st.info(result_data['translated'])
+        # 跨語言正規化細節
+        with st.expander("📝 檢視語意正規化分析結果 (XAI)"):
+            st.info(res['translated'])
+            
     else:
-        # 當還沒掃描時，顯示操作說明
+        # 初始狀態：顯示操作說明
         st.write("---")
         st.markdown("### 📖 系統操作說明")
         st.write("1. **貼入本文**：支援跨語言郵件內容。")
-        st.write("2. **深度分析**：系統將自動執行語意正規化與結構解析。")
-        st.write("3. **查看報告**：結合 **8 萬筆樣本** 之 AI 模型給出風險評估。」")
+        st.write("2. **深度分析**：系統將自動執行語義歸一化與結構解析。")
+        st.write("3. **查看報告**：結合 **8 萬筆樣本** 之 AI 模型給出風險評估。")
         st.info("💡 提示：貼入內容後點擊左側按鈕即可啟動掃描。")
