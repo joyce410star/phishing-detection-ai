@@ -75,33 +75,36 @@ with col_input:
     
     if st.button("🚀 執行深度威脅掃描"):
         if user_input:
-            with st.spinner('🔐 正在分析語意特徵...'):
+            with st.spinner('🔐 正在分析語意特徵與行為模式...'):
                 try:
-                    # 關鍵修正：強制指定從中文 (zh-TW) 翻譯成英文 (en)
-                    # 這樣 '永久停用' 會變成 'permanently disabled'，觸發 AI 的警報
-                    translated = GoogleTranslator(source='zh-TW', target='en').translate(user_input)
+                    # 1. 執行語意歸一化
+                    translated = GoogleTranslator(source='auto', target='en').translate(user_input)
                     
+                    # 2. 進階特徵偵測 (大學生水準的額外邏輯)
+                    has_short_url = any(x in user_input for x in ['bit.ly', 'tinyurl', 't.co'])
+                    urgency_words = ['urgent', 'immediately', 'permanently', 'verify', 'disabled']
+                    found_words = [word for word in urgency_words if word in translated.lower()]
+                    
+                    # 3. AI 預測
                     vec = tfidf_vec.transform([translated])
                     prob = ai_model.predict_proba(vec)[0][1]
                     
+                    # 4. 專業顯示區塊
                     with col_report:
-                        st.subheader("🕵️ 分析診斷報告")
+                        st.subheader("🕵️ 資安診斷報告")
+                        st.metric("威脅評分", f"{prob*100:.2f}%", delta="⚠️ 高危" if prob > 0.5 else "✅ 安全")
                         
-                        # 1. 補回風險指數卡片 (這是專業感的來源！)
-                        st.markdown(f"""<div class='metric-card'>
-                            <p style='margin:0; font-size:12px; color:#6b7280;'>THREAT SCORE</p>
-                            <h2 style='margin:0; color:#1e3a8a;'>{prob*100:.2f}%</h2>
-                        </div>""", unsafe_allow_html=True)
+                        # 展示行為特徵 (這就是專業感！)
+                        st.write("### 🔍 行為特徵提取 (UBA Analysis)")
+                        col_a, col_b = st.columns(2)
+                        col_a.markdown(f"**縮網址偵測：** {'🔴 異常' if has_short_url else '🟢 無'}")
+                        col_b.markdown(f"**誘導詞數量：** {len(found_words)}")
                         
-                        # 2. 判斷並顯示狀態燈號與文字分析
-                        if prob > 0.5:
-                            st.error(f"⚠️ 偵測到高度釣魚威脅")
-                            st.write("**分析：** 語意中包含顯著誘導特徵，如永久停用或緊急驗證。")
-                        else:
-                            st.success(f"✅ 檢測結果：安全")
-                            st.write("**分析：** 語意模式符合正常商務通訊基準。")
+                        if found_words:
+                            st.warning(f"偵測到高危攻擊行為：{', '.join(found_words)}")
                         
-                        with st.expander("📝 檢視語意處理結果"):
+                        st.write("---")
+                        with st.expander("📝 檢視跨語言語意正規化 (Normalization)"):
                             st.info(translated)
                 except Exception as e:
                     st.error(f"掃描失敗: {e}")
