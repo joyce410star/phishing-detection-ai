@@ -77,41 +77,37 @@ with col_input:
         if user_input:
             with st.spinner('🔐 執行語意歸一化與行為模式比對...'):
                 try:
-                    # 1. 語意歸一化處理
+                    # 1. 強制翻譯 (歸一化處理)
                     translated = GoogleTranslator(source='auto', target='en').translate(user_input)
                     
-                    # 2. 行為特徵提取 (UBA Analysis) - 讓報告專業的關鍵
-                    # 偵測縮網址
+                    # 2. 進階行為偵測 (大學專題加分點)
+                    # 偵測縮網址 (資安實戰邏輯)
                     short_urls = ['bit.ly', 'tinyurl', 't.co', 'goo.gl', 'reurl']
                     has_short_url = any(url in user_input.lower() for url in short_urls)
                     
-                    # 偵測高危險誘導動詞
+                    # 偵測 UBA 行為基線中常見的誘導動詞
                     danger_keywords = ['verify', 'urgently', 'permanently', 'disabled', 'suspended', 'immediately']
                     found_keywords = [word for word in danger_keywords if word in translated.lower()]
                     
-                    # 3. AI 模型預測
+                    # 3. AI 模型計算
                     vec = tfidf_vec.transform([translated])
                     prob = ai_model.predict_proba(vec)[0][1]
                     
                     with col_report:
                         st.subheader("🕵️ 資安診斷報告")
-                        # 顯示風險機率卡片
+                        # 視覺化分數
                         st.metric("威脅評分 (Threat Score)", f"{prob*100:.2f}%", delta="⚠️ 高危" if prob > 0.5 else "✅ 安全")
                         
-                        # 填充行為特徵提取區塊
+                        # 動態填充行為分析區塊
                         st.write("### 🔍 行為特徵提取 (UBA Analysis)")
                         c1, c2 = st.columns(2)
                         c1.markdown(f"**縮網址偵測：** {'🔴 異常' if has_short_url else '🟢 無'}")
                         c2.markdown(f"**誘導詞數量：** {len(found_keywords)}")
                         
                         if found_keywords:
-                            st.warning(f"偵測到攻擊特徵詞：{', '.join(found_keywords)}")
-                        
-                        st.write("---")
-                        with st.expander("📝 檢視跨語言語意正規化 (Normalization)"):
-                            st.info(translated)
+                            st.warning(f"偵測到高危攻擊特徵：{', '.join(found_keywords)}")
                 except Exception as e:
-                    st.error(f"系統偵測中斷: {e}")
+                    st.error(f"偵測失敗: {e}")
         else:
             st.warning("請輸入內容。")
 
