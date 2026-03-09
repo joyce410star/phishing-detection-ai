@@ -85,21 +85,21 @@ with col_input:
                     prob = ai_model.predict_proba(vec)[0][1]
                     
                     with col_report:
-                    st.subheader("🕵️ 分析診斷報告")
-                    
-                    # 1. 補回風險指數卡片 (這是專業感的來源！)
-                    st.markdown(f"""<div class='metric-card'>
-                        <p style='margin:0; font-size:12px; color:#6b7280;'>THREAT SCORE</p>
-                        <h2 style='margin:0; color:#1e3a8a;'>{prob*100:.2f}%</h2>
-                    </div>""", unsafe_allow_html=True)
-                    
-                    # 2. 判斷並顯示狀態燈號與文字分析
-                    if prob > 0.5:
-                        st.error(f"⚠️ 偵測到高度釣魚威脅")
-                        st.write("**分析：** 語意中包含顯著誘導特徵，如永久停用或緊急驗證。")
-                    else:
-                        st.success(f"✅ 檢測結果：安全")
-                        st.write("**分析：** 語意模式符合正常商務通訊基準。")
+                        st.subheader("🕵️ 分析診斷報告")
+                        
+                        # 1. 補回風險指數卡片 (這是專業感的來源！)
+                        st.markdown(f"""<div class='metric-card'>
+                            <p style='margin:0; font-size:12px; color:#6b7280;'>THREAT SCORE</p>
+                            <h2 style='margin:0; color:#1e3a8a;'>{prob*100:.2f}%</h2>
+                        </div>""", unsafe_allow_html=True)
+                        
+                        # 2. 判斷並顯示狀態燈號與文字分析
+                        if prob > 0.5:
+                            st.error(f"⚠️ 偵測到高度釣魚威脅")
+                            st.write("**分析：** 語意中包含顯著誘導特徵，如永久停用或緊急驗證。")
+                        else:
+                            st.success(f"✅ 檢測結果：安全")
+                            st.write("**分析：** 語意模式符合正常商務通訊基準。")
                         
                         with st.expander("📝 檢視語意處理結果"):
                             st.info(translated)
