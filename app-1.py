@@ -117,3 +117,12 @@ with col_input:
                             st.info(translated)
                 except Exception as e:
                     st.error(f"偵測異常: {e}")
+                    # 確保這段程式碼在 app-1.py 的最後面，且在 col_report 的範圍內
+with col_report:
+    if 'prob' not in locals():
+        st.write("---")
+        st.markdown("### 📖 系統操作說明")
+        st.write("1. **貼入本文**：支援跨語言郵件內容。")
+        st.write("2. **深度分析**：系統將自動執行語意正規化與結構解析。")
+        st.write("3. **查看報告**：結合 **8 萬筆樣本** 之 AI 模型給出風險評估。")
+        st.info("💡 提示：貼入內容後點擊左側按鈕即可啟動掃描。")
