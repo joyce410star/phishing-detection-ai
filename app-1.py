@@ -4,156 +4,122 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from deep_translator import GoogleTranslator
 import os
+import re
 
-# 1. 頁面基礎配置：全白商務簡約風格
+# 1. 頁面配置
 st.set_page_config(page_title="AI Phishing Guard Pro", layout="wide", page_icon="🛡️")
 
-# 2. 專業 CSS 樣式優化
+# 2. 專業戰情室 CSS 樣式
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; color: #1f2937; }
-    [data-testid="stSidebar"] { background-color: #f9fafb !important; border-right: 1px solid #e5e7eb; }
-    .stTextArea textarea {
-        background-color: #ffffff !important;
-        color: #1f2937 !important;
-        border: 1px solid #d1d5db !important;
-        border-radius: 12px !important;
-        padding: 15px !important;
-    }
     .metric-card {
-        background: #ffffff;
-        border-radius: 12px;
-        padding: 20px;
-        border: 1px solid #e5e7eb;
-        border-left: 6px solid #3b82f6;
-        margin-bottom: 15px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        background: #ffffff; border-radius: 12px; padding: 20px;
+        border: 1px solid #e5e7eb; border-left: 6px solid #3b82f6;
+        margin-bottom: 15px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .analysis-box {
+        background: #f8fafc; border-radius: 10px; padding: 15px;
+        border: 1px solid #e2e8f0; margin-bottom: 10px;
     }
     h1, h2, h3 { color: #1e3a8a !important; font-weight: 700 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 側邊欄：展示研究數據基礎
+# 3. 側邊欄：研究數據基礎
 with st.sidebar:
     st.markdown("## 🛡️ 威脅情報核心")
     st.write("---")
     st.markdown('<div class="metric-card"><b>🔹 資料庫母體</b><br>82,486 筆郵件數據</div>', unsafe_allow_html=True)
-    st.markdown('<div class="metric-card"><b>🎯 模型準確率</b><br>95.12% (經由驗證集測試)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="metric-card"><b>🎯 模型準確率</b><br>95.12%</div>', unsafe_allow_html=True)
     st.write("---")
     st.markdown("### 🔍 惡意行為特徵 (UBA)")
-    
-    # 讀取行為基線比對圖
     img_path = 'analysis_result.png'
-    if os.path.exists(img_path):
+    if os.path.exists(img_path) and os.path.getsize(img_path) > 0:
         st.image(img_path, caption="行為基線比對圖", use_container_width=True)
-    
-    st.info("系統透過 TF-IDF 演算法自動提取連結與關鍵動詞之權重。")
 
-# 4. 模型載入函式：修正縮排與路徑問題
-# 修正後的模型載入函式
+# 4. 模型載入
 @st.cache_resource
 def load_and_train():
     try:
-        # 1. 檢查檔案是否存在
-        if not os.path.exists('phishing_small.csv'):
-            st.error("❌ 找不到數據集檔案 phishing_small.csv，請確認已上傳至 GitHub。")
-            st.stop()
-            
-        # 2. 嘗試讀取數據
         df = pd.read_csv('phishing_small.csv').dropna(subset=['text_combined'])
-        
-        # 檢查檔案是否為空
-        if df.empty:
-            st.error("❌ 檔案內容為空 (EmptyDataError)，請重新上傳正確的數據集。")
-            st.stop()
-            
-        # 3. 執行抽樣與訓練
         df_sample = df.sample(min(15000, len(df)), random_state=42)
         tfidf = TfidfVectorizer(stop_words='english', max_features=3000)
         X = tfidf.fit_transform(df_sample['text_combined'].astype(str))
         model = MultinomialNB()
         model.fit(X, df_sample['label'])
         return tfidf, model
-        
-    except pd.errors.EmptyDataError:
-        st.error("❌ 數據集檔案損毀或無內容，請檢查 GitHub 上的檔案。")
-        st.stop()
-    except Exception as e:
-        st.error(f"❌ 系統初始化失敗: {e}")
-        st.stop()
+    except: return None, None
 
-# 執行載入
 tfidf_vec, ai_model = load_and_train()
 
 # 5. 主頁面佈局
 st.title("🛡️ 智慧資安：跨語言釣魚郵件 AI 偵測系統")
-st.markdown("##### 結合機器學習與行為分析，識別潛藏在電子郵件中的社交工程威脅")
-
-col_input, col_report = st.columns([1.3, 1])
+col_input, col_report = st.columns([1.2, 1])
 
 with col_input:
-    st.subheader("📥 待測郵件掃描 (Email Packet)")
-    user_input = st.text_area("請在此貼入郵件本文：", height=380, placeholder="等待輸入內容...")
+    st.subheader("📥 待測郵件掃描 (Email Structure Analysis)")
+    user_input = st.text_area("請在此貼入郵件本文：", height=400, placeholder="Waiting for input...")
     
-    if st.button("🚀 啟動 AI 威脅深度掃描"):
-        if user_input:
-            with st.spinner('🔐 執行語意正規化與惡意模式比對...'):
+    if st.button("🚀 啟動深度威脅分析"):
+        if user_input and ai_model:
+            with st.spinner('🔐 執行語意正規化與結構分析...'):
                 try:
-                    # 1. 語意正規化 (解決跨語言偵測難題)
-                    translated = GoogleTranslator(source='auto', target='en').translate(user_input).lower()
+                    # A. 執行正規化
+                    translated = GoogleTranslator(source='auto', target='en').translate(user_input)
+                    t_lower = translated.lower()
                     
-                    # 2. 偵測特定惡意模式 (Detected suspicious patterns)
-                    # 定義你要求的專業偵測清單
-                    patterns = {
-                        "Urgency (急迫性誘導)": ["urgent", "immediately", "final warning", "within 2 hours"],
-                        "Credential Harvesting (憑證釣魚)": ["verify account", "security credentials", "login", "password"],
-                        "Call to Action (引導點擊)": ["click here", "update-now", "access link", "follow the link"]
-                    }
+                    # B. Email 結構分析邏輯 (新功能)
+                    # 1. Links Detected (使用正則表達式提取網址)
+                    links = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', user_input)
                     
-                    detected_patterns = []
-                    for category, keywords in patterns.items():
-                        for word in keywords:
-                            if word in translated:
-                                detected_patterns.append(f"🎯 {category}: `{word}`")
+                    # 2. Urgency Language (急迫性語法)
+                    urgency_words = ["urgent", "immediately", "within 2 hours", "final warning", "expired", "action required"]
+                    urgency_hits = [w for w in urgency_words if w in t_lower]
                     
-                    # 3. 縮網址偵測邏輯
-                    short_urls = ['bit.ly', 'tinyurl', 't.co', 'goo.gl', 'reurl', 'sec-login', '.xyz']
-                    has_short_url = any(url in user_input.lower() for url in short_urls)
+                    # 3. Financial Request (財務/帳據請求)
+                    finance_words = ["verify account", "bank", "payment", "invoice", "credit card", "security credentials"]
+                    finance_hits = [w for w in finance_words if w in t_lower]
                     
-                    # 4. AI 預測
+                    # C. AI 預測
                     vec = tfidf_vec.transform([translated])
                     prob = ai_model.predict_proba(vec)[0][1]
                     
                     with col_report:
                         st.subheader("🕵️ 資安診斷報告")
-                        st.metric("威脅評分", f"{prob*100:.2f}%", delta="⚠️ 高危" if prob > 0.5 else "✅ 安全")
+                        st.metric("威脅評分 (Threat Score)", f"{prob*100:.2f}%", delta="⚠️ 高危" if prob > 0.7 else "✅ 安全")
                         
-                        # --- 專業版報告區塊 ---
-                        st.write("### 🚨 Detected Suspicious Patterns")
-                        if detected_patterns:
-                            for p in detected_patterns:
-                                st.write(p)
-                        else:
-                            st.write("🟢 未發現顯著語意威脅模式")
+                        # --- 專業結構分析顯示區 ---
+                        st.write("### 🏗️ Email Structure Analysis")
+                        
+                        # 顯示 Links Detected
+                        with st.container():
+                            st.markdown(f"**🔗 Links Detected:** {len(links)} 筆")
+                            if links:
+                                for link in links[:2]: st.code(link, language="text") # 顯示前兩筆
+                        
+                        # 顯示 Urgency & Finance 狀態
+                        st.markdown(f"**⚡ Urgency Language:** {'🔴 偵測到急迫誘導' if urgency_hits else '🟢 正常'}")
+                        st.markdown(f"**💰 Financial Request:** {'🔴 涉及帳據請求' if finance_hits else '🟢 無相關描述'}")
                         
                         st.write("---")
-                        st.write("### 🔍 行為特徵提取 (UBA Analysis)")
-                        st.markdown(f"**縮網址偵測：** {'🔴 異常' if has_short_url else '🟢 無'}")
-                        st.markdown(f"**誘導詞命中總數：** {len(detected_patterns)}")
-                        
-                        with st.expander("📝 檢視語意處理結果 (Explainable AI)"):
+                        st.write("### 🚨 Detected Suspicious Patterns")
+                        all_patterns = urgency_hits + finance_hits
+                        if all_patterns:
+                            st.warning(f"命中特徵：{', '.join(all_patterns)}")
+                        else:
+                            st.success("未發現顯著語意攻擊特徵。")
+
+                        with st.expander("📝 檢視語意正規化分析結果"):
                             st.info(translated)
-                            
                 except Exception as e:
                     st.error(f"偵測異常: {e}")
         else:
-            st.warning("請先輸入郵件內容。")
+            st.warning("請輸入內容並確保數據集已備妥。")
 
-# 初始說明畫面
 with col_report:
     if 'prob' not in locals():
         st.write("---")
         st.markdown("### 📖 操作說明")
-        st.write("1. 貼入任何語言的郵件內容。")
-        st.write("2. 系統將自動執行語意正規化，解決語言偏差問題。")
-        st.write("3. 基於 **8 萬筆樣本** 之行為模式比對給出風險評估。")
+        st.write("1. 貼入郵件本文，系統會自動解析連結與語法結構。")
+        st.write("2. 結合 **8 萬筆樣本** 之 AI 模型進行深度診斷。")
