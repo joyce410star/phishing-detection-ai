@@ -7,7 +7,7 @@ from langdetect import detect
 import os
 import re
 
-# 1. 頁面配置
+# 1. 頁面基礎配置
 st.set_page_config(page_title="AI Phishing Guard Pro", layout="wide", page_icon="🛡️")
 
 # 2. 專業 CSS 樣式
@@ -27,11 +27,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 初始化狀態，防止 NameError
+# 3. 初始化狀態 (解決 NameError 的關鍵)
 if 'last_res' not in st.session_state:
     st.session_state.last_res = None
 
-# 3. 側邊欄
+# 4. 側邊欄：Model Information
 with st.sidebar:
     st.markdown("## ⚙️ Model Information")
     st.markdown('<div class="metric-card"><b>DATASET SIZE</b><br>40,000 Emails</div>', unsafe_allow_html=True)
@@ -39,7 +39,7 @@ with st.sidebar:
     if os.path.exists('analysis_result.png'):
         st.image('analysis_result.png', caption="Behavior Baseline Analysis", use_container_width=True)
 
-# 4. 模型載入
+# 5. 模型載入
 @st.cache_resource
 def load_and_train():
     try:
@@ -54,7 +54,7 @@ def load_and_train():
 
 tfidf_vec, ai_model = load_and_train()
 
-# 5. 主分頁
+# 6. 主頁面佈局
 st.title("🛡️ 智慧資安：跨語言釣魚郵件 AI 偵測系統")
 tab1, tab2 = st.tabs(["🔍 單封深度掃描 (XAI Enabled)", "📂 CSV 批次分析"])
 
@@ -66,25 +66,24 @@ with tab1:
         u_input = st.text_area("請在此貼入郵件本文：", height=350, key="txt_input")
         if st.button("🚀 啟動 XAI 深度威脅分析"):
             if u_input and ai_model:
-                with st.spinner('🔐 正在分析決策路徑...'):
+                with st.spinner('🔐 正在分析決策路踐...'):
                     # A. 正規化
                     trans = GoogleTranslator(source='auto', target='en').translate(u_input)
                     t_low = trans.lower()
                     
-                    # B. 結構與 XAI 特徵提取
+                    # B. 結構解析與 XAI 特徵提取
                     links = re.findall(r'https?://([a-zA-Z0-9.-]+)', u_input)
                     urg_words = ["urgent", "immediately", "verify", "suspended", "limit", "warning"]
                     fin_words = ["bank", "payment", "login", "account", "credentials", "invoice"]
                     
-                    urg_hits = [w for w in urg_words if w in t_lower]
-                    fin_hits = [w for w in fin_words if w in t_lower]
+                    urg_hits = [w for w in urg_words if w in t_low]
+                    fin_hits = [w for w in fin_words if w in t_low]
                     
                     # C. AI 預測與權重補償
-                    vec = tfidf_vec.transform([trans])
-                    prob = ai_model.predict_proba(vec)[0][1]
+                    prob = ai_model.predict_proba(tfidf_vec.transform([trans]))[0][1]
                     if len(urg_hits) + len(fin_hits) >= 2: prob = min(0.99, prob + 0.3)
                     
-                    # 將所有結果打包存入 session_state，解決變數定義問題
+                    # 儲存結果到 session_state
                     st.session_state.last_res = {
                         "score": prob * 100, "links": links,
                         "urg": urg_hits, "fin": fin_hits, "trans": trans
@@ -92,17 +91,17 @@ with tab1:
                     st.rerun()
 
     with col_res:
-        # 檢查是否有存檔結果，若無則顯示說明
         if st.session_state.last_res:
             res = st.session_state.last_res
             s = res['score']
             
-            # 1. 威脅評分標籤
+            # 威脅評分標籤
             status, color = ("🔴 高危", "inverse") if s > 70 else (("🟡 中風險", "off") if s >= 40 else ("✅ 安全", "normal"))
             st.subheader("🕵️ 資安診斷報告")
             st.metric("Threat Score", f"{s:.2f}%", delta=status, delta_color=color)
             
-            # 2. XAI 決策路徑：Explainability
+            # XAI 決策路徑 (Explainability)
+            
             st.write("### 🧠 AI 決策路徑 (Decision Path)")
             st.markdown(f"""<div class="xai-box">
                 <b>📍 關鍵詞命中 (Keyword Hits):</b><br>
@@ -113,7 +112,7 @@ with tab1:
                 {f"指向域名：`{', '.join(res['links'])}`" if res['links'] else "🟢 未發現外部連結"}
             </div>""", unsafe_allow_html=True)
             
-            with st.expander("📝 檢視語意處理結果"):
+            with st.expander("📝 查看語意正規化原文"):
                 st.info(res['trans'])
         else:
-            st.info("💡 貼入內容並啟動掃描，系統將展示 Explainability 判斷依據。")
+            st.info("💡 請貼入內容並啟動掃描，系統將展示 XAI 判斷依據。")
