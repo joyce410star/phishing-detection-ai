@@ -3,3 +3,7 @@ pandas
 scikit-learn
 deep-translator
 langdetect
+pandas
+scikit-learn
+deep-translator
+langdetect
