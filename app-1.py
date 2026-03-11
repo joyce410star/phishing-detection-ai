@@ -10,7 +10,7 @@ import re
 # 1. 頁面基礎配置
 st.set_page_config(page_title="AI Phishing Guard Pro", layout="wide", page_icon="🛡️")
 
-# 2. 專業 CSS 樣式
+# 2. 專業 CSS 樣式與 XAI 容器設計
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; color: #1f2937; }
@@ -18,28 +18,42 @@ st.markdown("""
     .xai-box {
         background-color: #f0f7ff; border: 1px solid #bae6fd;
         border-radius: 8px; padding: 15px; border-left: 5px solid #0284c7;
+        margin-bottom: 15px;
     }
     .metric-card {
         background: #ffffff; border-radius: 12px; padding: 20px;
-        border: 1px solid #e5e7eb; border-left: 6px solid #3b82f6; margin-bottom: 15px;
+        border: 1px solid #e5e7eb; border-left: 6px solid #3b82f6;
+        margin-bottom: 15px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
+    .batch-res { padding: 10px; border-radius: 8px; margin-bottom: 5px; border: 1px solid #e5e7eb; }
     h1, h2, h3 { color: #1e3a8a !important; font-weight: 700 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 初始化狀態容器
+# 初始化 Session State 以確保分頁切換穩定
 if 'last_res' not in st.session_state:
     st.session_state.last_res = None
 
 # 3. 側邊欄：Model Information
 with st.sidebar:
     st.markdown("## ⚙️ Model Information")
-    st.markdown('<div class="metric-card"><b>DATASET SIZE</b><br>40,000 Emails</div>', unsafe_allow_html=True)
-    st.markdown('<div class="metric-card"><b>ACCURACY</b><br>92%</div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div class="metric-card">
+        <div style="color:#6b7280; font-size:0.85rem; font-weight:600;">DATASET SIZE</div>
+        <div style="color:#1e3a8a; font-size:1.1rem; font-weight:700;">40,000 Emails</div>
+        <div style="color:#6b7280; font-size:0.85rem; font-weight:600;">CORE MODEL</div>
+        <div style="color:#1e3a8a; font-size:1.1rem; font-weight:700;">Naive Bayes</div>
+        <div style="color:#6b7280; font-size:0.85rem; font-weight:600;">ACCURACY</div>
+        <div style="color:#1e3a8a; font-size:1.1rem; font-weight:700;">92%</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.write("---")
+    st.markdown("### 🔍 惡意行為特徵 (UBA)")
     if os.path.exists('analysis_result.png'):
         st.image('analysis_result.png', caption="Behavior Baseline Analysis", use_container_width=True)
 
-# 4. 模型載入 (在線訓練模式)
+# 4. 核心分析引擎 (與 VS Code 測試端邏輯完全同步)
 @st.cache_resource
 def load_and_train():
     try:
@@ -54,77 +68,106 @@ def load_and_train():
 
 tfidf_vec, ai_model = load_and_train()
 
-# 5. 核心分析函式 (供兩個分頁共用)
-def analyze_content(text):
-    # 語意正規化
+def analyze_email(text):
+    # A. 語意正規化 (XAI 第一層)
     try:
         lang = detect(text)
         trans = GoogleTranslator(source='auto', target='en').translate(text) if lang != 'en' else text
     except: trans = text
     
     t_low = trans.lower()
+    explanations = []
+    
+    # B. 結構特徵偵測
     links = re.findall(r'https?://([a-zA-Z0-9.-]+)', text)
-    urg_words = ["urgent", "immediately", "verify", "suspended", "limit", "warning"]
+    urg_words = ["urgent", "immediately", "verify", "suspended", "limit", "warning", "24 hours"]
     fin_words = ["bank", "payment", "login", "account", "credentials", "invoice"]
     
     urg_hits = [w for w in urg_words if w in t_low]
     fin_hits = [w for w in fin_words if w in t_low]
     
-    # AI 預測與權重補償
+    # C. AI 預測
     vec = tfidf_vec.transform([trans])
     prob = ai_model.predict_proba(vec)[0][1]
-    if len(urg_hits) + len(fin_hits) >= 2: prob = min(0.99, prob + 0.3)
+    explanations.append(f"🔹 AI 語意原始評分: {prob*100:.1f}%")
     
-    return {"score": prob * 100, "links": links, "urg": urg_hits, "fin": fin_hits, "trans": trans}
+    # D. 權重補償邏輯 (Explainable Reasoning)
+    score = prob
+    if links:
+        score += 0.2
+        explanations.append(f"🚩 發現外部連結: `{', '.join(list(set(links)))}` (+20%)")
+    if urg_hits:
+        score += 0.15 * len(urg_hits)
+        explanations.append(f"⚠️ 命中急迫性詞彙: {', '.join(urg_hits)} (+{15*len(urg_hits)}%)")
+    if fin_hits:
+        score += 0.15 * len(fin_hits)
+        explanations.append(f"💰 涉及財務敏感詞: {', '.join(fin_hits)} (+{15*len(fin_hits)}%)")
+    if links and (urg_hits or fin_hits):
+        score += 0.1
+        explanations.append(f"🧬 複合威脅：連結與誘導語同時出現 (+10%)")
 
-# 6. 主介面分頁架構
-tab1, tab2 = st.tabs(["🔍 單封深度掃描 (XAI Enabled)", "📂 CSV 批次分析"])
+    return {
+        "final_score": min(score, 1.0) * 100,
+        "raw_prob": prob * 100,
+        "explanations": explanations,
+        "trans": trans,
+        "links_count": len(links)
+    }
+
+# 5. 主介面分頁架構
+st.title("🛡️ 智慧資安：跨語言釣魚郵件 AI 偵測系統")
+tab1, tab2 = st.tabs(["🔍 單封深度掃描 (XAI)", "📂 CSV 批次分析"])
 
 # --- TAB 1: 單封掃描 ---
 with tab1:
     col_in, col_res = st.columns([1.2, 1])
     with col_in:
         st.subheader("📥 待測郵件掃描")
-        u_input = st.text_area("請在此貼入郵件本文：", height=350, key="single_input")
-        if st.button("🚀 啟動 XAI 深度威脅分析"):
+        u_input = st.text_area("請在此貼入郵件本文：", height=350, key="single_in", placeholder="貼入郵件內容進行 XAI 深度鑑定...")
+        if st.button("🚀 啟動 XAI 威脅鑑定", key="run_single"):
             if u_input and ai_model:
-                st.session_state.last_res = analyze_content(u_input)
-                st.rerun()
-            else: st.warning("請輸入內容並確保數據集已備妥。")
+                with st.spinner('🔐 執行決策路徑分析中...'):
+                    st.session_state.last_res = analyze_email(u_input)
+                    st.rerun()
+            else: st.warning("請輸入內容。")
 
     with col_res:
         if st.session_state.last_res:
             res = st.session_state.last_res
-            s = res['score']
-            status, color = ("🔴 高危", "inverse") if s > 70 else (("🟡 中風險", "off") if s >= 40 else ("✅ 安全", "normal"))
-            st.subheader("🕵️ 資安診斷報告")
-            st.metric("Threat Score", f"{s:.2f}%", delta=status, delta_color=color)
+            s = res["final_score"]
+            status, delta_c = ("🔴 HIGH", "inverse") if s > 70 else (("🟡 MEDIUM", "off") if s >= 40 else ("✅ SAFE", "normal"))
             
-            # XAI 決策路徑
-            st.write("### 🧠 AI 決策路徑 (Decision Path)")
-            st.markdown(f"""<div class="xai-box">
-                <b>📍 關鍵詞命中:</b> {", ".join([f"`{w}`" for w in res['urg']]) if res['urg'] else "🟢 無"}<br>
-                <b>💰 金融用語偵測:</b> {", ".join([f"`{w}`" for w in res['fin']]) if res['fin'] else "🟢 無"}<br>
-                <b>🔗 連結指向:</b> {f"`{', '.join(res['links'])}`" if res['links'] else "🟢 無"}
-            </div>""", unsafe_allow_html=True)
-        else: st.info("💡 貼入內容並啟動掃描以查看 XAI 判斷依據。")
+            st.subheader("🕵️ 資安診斷報告")
+            st.metric("Risk Score", f"{s:.2f}%", delta=status, delta_color=delta_c)
+            st.progress(s/100)
+            
+            st.write("### 🧠 AI 決策路徑 (Explainability)")
+            st.markdown('<div class="xai-box">' + "<br>".join(res["explanations"]) + '</div>', unsafe_allow_html=True)
+            
+            with st.expander("📝 檢視語意正規化結果"):
+                st.info(res["trans"])
+        else:
+            st.info("💡 貼入內容並啟動掃描，系統將展示 Explain, Don't Just Warn 判定依據。")
 
-# --- TAB 2: CSV 批次分析 (修復後) ---
+# --- TAB 2: CSV 批次分析 ---
 with tab2:
-    st.subheader("📂 批量威脅鑑定中心 (Batch Processing)")
-    up_csv = st.file_uploader("選擇上傳 CSV 檔案", type="csv", key="csv_batch_up")
-    
+    st.subheader("📂 批量威脅鑑定中心")
+    up_csv = st.file_uploader("選擇上傳 CSV 檔案", type="csv", key="csv_batch")
     if up_csv and ai_model:
         df_b = pd.read_csv(up_csv)
-        col_sel = st.selectbox("請選擇郵件內容欄位：", df_b.columns)
-        if st.button("🛠️ 開始批量掃描任務"):
-            with st.spinner('AI 正在分析大量封包數據...'):
-                texts = df_b[col_sel].astype(str).tolist()
-                for i, txt in enumerate(texts[:30]):
-                    res_b = analyze_content(txt)
-                    p = res_b['score']
-                    label = "🚨 PHISHING" if p > 50 else "✅ SAFE"
-                    st.markdown(f"<div style='padding:10px; border-radius:8px; background:{'#fee2e2' if p > 50 else '#dcfce7'}; margin-bottom:5px;'>Email #{i+1} → <b>{label}</b> ({p:.1f}%)</div>", unsafe_allow_html=True)
-            st.success(f"✅ 批量掃描完成，處理 {len(texts)} 筆數據。")
-    elif not ai_model:
-        st.error("❌ 模型載入失敗，無法執行批次分析。")
+        col_name = st.selectbox("請選擇郵件內容欄位：", df_b.columns)
+        limit = st.slider("分析筆數", 5, 50, 10)
+        
+        if st.button("🛠️ 開始批量掃描任務", key="run_batch"):
+            with st.spinner('正在處理批量數據...'):
+                for i, txt in enumerate(df_b[col_name].astype(str).tolist()[:limit]):
+                    b_res = analyze_email(txt)
+                    p = b_res["final_score"]
+                    c = "#fee2e2" if p > 70 else ("#fef3c7" if p >= 40 else "#dcfce7")
+                    l = "🔴 PHISHING" if p > 70 else ("🟡 SUSPICIOUS" if p >= 40 else "✅ SAFE")
+                    
+                    st.markdown(f"""<div class="batch-res" style="background:{c}">
+                        Email #{i+1} → <b>{l}</b> ({p:.1f}%) <br>
+                        <small style="color:#4b5563">理由：{", ".join([e.split(': ')[0] for e in b_res['explanations'] if '🔹' not in e])}</small>
+                    </div>""", unsafe_allow_html=True)
+            st.success("批量任務已完成。")
