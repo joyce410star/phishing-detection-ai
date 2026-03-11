@@ -120,7 +120,7 @@ with tab2:
         if st.button("🛠️ 開始批量掃描任務"):
             with st.spinner('AI 正在分析大量封包數據...'):
                 texts = df_b[col_sel].astype(str).tolist()
-                for i, txt in enumerate(texts[:10]):
+                for i, txt in enumerate(texts[:20]):
                     res_b = analyze_content(txt)
                     p = res_b['score']
                     label = "🚨 PHISHING" if p > 50 else "✅ SAFE"
