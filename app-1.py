@@ -149,3 +149,24 @@ with tab1:
                 st.warning(f"🎯 **關鍵詞命中：** {', '.join(res['hits'])}")
         else:
             st.info("💡 選擇平台並輸入訊息後，AI 將拆解決策原因。")
+with tab2:
+    st.subheader("📂 批量威脅鑑定中心")
+    # 給予獨立 key，確保分頁切換時組件不會消失
+    up_csv = st.file_uploader("選擇上傳 CSV 檔案", type="csv", key="csv_file_up")
+    
+    if up_csv:
+        df_b = pd.read_csv(up_csv)
+        # 讓使用者選擇批次數據的來源平台
+        batch_plat = st.selectbox("這批數據的來源類型：", ["Email", "LINE / 社群", "SMS / 簡訊"], key="b_plat")
+        col_name = st.selectbox("選擇內容欄位：", df_b.columns, key="b_col")
+        
+        if st.button("🛠️ 開始批量掃描任務", key="b_run"):
+            if ai_model:
+                for i, txt in enumerate(df_b[col_name].astype(str).tolist()[:10]):
+                    res_b = analyze_scam(txt, batch_plat)
+                    p = res_b["final_score"]
+                    # 根據風險顯示顏色背景
+                    c = "#fee2e2" if p > 70 else ("#fef3c7" if p >= 40 else "#dcfce7")
+                    st.markdown(f'<div class="batch-res" style="background:{c}; padding:10px; border-radius:8px; margin-bottom:5px;">Email #{i+1} → <b>{p:.1f}%</b></div>', unsafe_allow_html=True)
+            else:
+                st.error("模型尚未準備就緒，請檢查數據集。")
