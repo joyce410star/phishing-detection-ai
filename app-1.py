@@ -65,20 +65,29 @@ def analyze_scam(text, platform):
     
     # --- 關鍵：將判斷理由與加權掛鉤 ---
     # A. 關鍵字加權
+    # 找到 analyze_scam 函式中的加權部分並修改：
+
+    # A. 關鍵字加權
     hits = [w for w in p_weights[platform] if w in t_low or w in text]
-    # 在 analyze_scam 函式的加權判斷處：
     if hits:
         w = 15 * len(set(hits))
         final_score += (w / 100)
         reasons.append(f"關鍵詞命中：{', '.join(list(set(hits)))} (+{w}%)")
-
+    
+    # B. 附件偵測
     if attachments:
         final_score += 0.2
         reasons.append(f"可疑附件偵測：*.{attachments[0]} (+20%)")
         
+    # C. 連結偵測
     if links:
         final_score += 0.15
         reasons.append(f"惡意連結指向偵測 (+15%)")
+        
+    # D. 緊急壓力偵測
+    if any(w in t_low for w in ["immediately", "3 days", "urgent", "立即", "三日內", "趕快"]):
+        final_score += 0.1
+        reasons.append("要求在限時內完成行動 (Urgency) (+10%)")
         
     # D. 緊急壓力偵測
     if any(w in t_low for w in ["immediately", "3 days", "urgent", "立即", "三日內", "趕快"]):
@@ -141,33 +150,34 @@ with tab1:
             s = res.get("final_score", 0)
             
             st.subheader("🕵️ 鑑定報告")
-            st.metric("Scam Probability", f"{s:.2f}%", delta="🔴 HIGH" if s > 70 else "🟢 SAFE")
+            st.metric("Scam Probability", f"{s:.2f}%", delta="🚨 HIGH" if s > 70 else "🟢 SAFE")
             
-            # --- 1. 判斷原因 (Explainable AI) ---
+            # --- 1. 判斷原因 (簡潔化：去掉百分比) ---
             st.write("### 📝 判斷原因")
-            reasons = res.get("explanations", [])
-            if reasons:
-                for r in reasons:
-                    # 只顯示文字，不重複顯示加分百分比
-                    clean_reason = r.split(' (+')[0] if ' (+' in r else r
+            full_reasons = res.get("explanations", [])
+            if full_reasons:
+                for r in full_reasons:
+                    # 使用 split 取出 (+ 之前的文字，讓結論變乾淨
+                    clean_reason = r.split(' (+')[0]
                     st.markdown(f"* {clean_reason}")
             else:
                 st.write("🟢 未偵測到顯著風險特徵。")
 
-            # --- 2. 判定類型標籤 ---
+            # 顯示判定類型
             s_type = res.get("type", "一般威脅")
-            # 根據類型給顏色
-            t_color = "#9333ea" if s_type == "投資詐騙" else ("#f97316" if s_type == "包裹/代收詐騙" else "#3b82f6")
-            st.markdown(f"**判定類型：** <span class='platform-tag' style='background:{t_color}'>{s_type}</span>", unsafe_allow_html=True)
-            
-            # --- 3. AI 可解釋性分析區塊 (XAI) ---
+            st.markdown(f"**判定類型：** <span class='platform-tag' style='background:#3b82f6'>{s_type}</span>", unsafe_allow_html=True)
+
+            # --- 2. AI 可解釋性分析 (XAI) (專業化：保留百分比) ---
             st.write("### 🧠 AI 可解釋性分析 (XAI)")
-            if reasons:
-                # 這裡顯示帶有加權百分比的原始資料，模擬 SHAP 特徵貢獻度
-                xai_content = "<br>".join([f"📈 {r}" if '(+' in r else f"🔍 {r}" for r in reasons])
+            if full_reasons:
+                # 這裡保留原始帶有 (+XX%) 的文字，放在藍色框框裡
+                xai_content = "<br>".join([f"📈 {r}" for r in full_reasons])
                 st.markdown(f'<div class="xai-box">{xai_content}</div>', unsafe_allow_html=True)
             else:
                 st.info("💡 目前純依賴 AI 語意模型判定。")
+
+            with st.expander("📝 檢視語意處理結果"):
+                st.info(res.get("trans", ""))
             with tab2:
                 st.subheader("📂 批量威脅鑑定中心")
                 # 給予獨立 key，確保分頁切換時組件不會消失
