@@ -130,36 +130,37 @@ with tab1:
     with col_res:
         if st.session_state.last_res:
             res = st.session_state.last_res
-            s = res["final_score"]
+            s = res.get("final_score", 0)
             
             st.subheader("🕵️ 鑑定報告")
-            st.metric("Scam Probability", f"{s:.2f}%")
+            st.metric("Scam Probability", f"{s:.2f}%", delta="🔴 HIGH" if s > 70 else "🟢 SAFE")
             
-            # --- 判斷原因區塊 (修正後的第 139 行) ---
-        st.write("### 📝 判斷原因 (Explainable AI)")
-        
-        # 使用 .get() 安全取值，即使名稱寫錯也不會崩潰
-        reasons_to_show = res.get("explanations", []) 
-        
-        if reasons_to_show:
-            for r in reasons_to_show:
-                st.markdown(f"* {r}")
-        else:
-            st.write("🟢 AI 基於整體語意判定為安全。")
-            # ----------------------------------------------
+            # --- 1. 判斷原因 (Explainable AI) ---
+            st.write("### 📝 判斷原因 (Explainable AI)")
+            # 使用 .get 確保名稱不對也不會當機
+            reasons = res.get("explanations", []) 
+            if reasons:
+                for r in reasons:
+                    st.markdown(f"* {r}")
+            else:
+                st.write("🟢 AI 判定此訊息為常規溝通。")
+
+            # --- 2. 判定類型標籤 ---
+            s_type = res.get("type", "一般威脅")
+            # 根據類型給顏色
+            t_color = "#9333ea" if s_type == "投資詐騙" else ("#f97316" if s_type == "包裹/代收詐騙" else "#3b82f6")
+            st.markdown(f"**判定類型：** <span class='platform-tag' style='background:{t_color}'>{s_type}</span>", unsafe_allow_html=True)
             
-            with st.expander("📝 檢視語意處理結果"):
-                st.info(res["trans"])
-            
-            # 顯示類型標籤
-            color = "#ef4444" if s > 70 else "#f59e0b"
-            st.markdown(f"**判定類型：** <span class='platform-tag' style='background:{color}'>{res['type']}</span>", unsafe_allow_html=True)
-            
+            # --- 3. AI 可解釋性分析區塊 (XAI) ---
             st.write("### 🧠 AI 可解釋性分析 (XAI)")
-            st.markdown('<div class="xai-box">' + ("<br>".join(res["explanations"]) if res["explanations"] else "🟢 未發現顯著人為權重補償，純模型判定。") + '</div>', unsafe_allow_html=True)
-            
-            if res["hits"]:
-                st.warning(f"🎯 **關鍵詞命中：** {', '.join(res['hits'])}")
+            if reasons:
+                # 這裡要確保 HTML 字串完整，避免 SyntaxError
+                st.markdown(f'<div class="xai-box">{"<br>".join(reasons)}</div>', unsafe_allow_html=True)
+            else:
+                st.info("💡 目前未發現顯著的人為加權特徵。")
+
+            with st.expander("📝 檢視語意處理結果"):
+                st.info(res.get("trans", "無翻譯資料"))
         else:
             st.info("💡 選擇平台並輸入訊息後，AI 將拆解決策原因。")
 with tab2:
