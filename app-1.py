@@ -66,19 +66,19 @@ def analyze_scam(text, platform):
     # --- 關鍵：將判斷理由與加權掛鉤 ---
     # A. 關鍵字加權
     hits = [w for w in p_weights[platform] if w in t_low or w in text]
+    # 在 analyze_scam 函式的加權判斷處：
     if hits:
-        final_score += 0.15 * len(set(hits))
-        reasons.append(f"🎯 命中風險關鍵詞：{', '.join(list(set(hits)))}")
-    
-    # B. 附件偵測 (針對你截圖中的 invoice_overdue.zip)
+        w = 15 * len(set(hits))
+        final_score += (w / 100)
+        reasons.append(f"關鍵詞命中：{', '.join(list(set(hits)))} (+{w}%)")
+
     if attachments:
         final_score += 0.2
-        reasons.append(f"📦 偵測到可疑附件檔案：`*.{attachments[0]}`")
+        reasons.append(f"可疑附件偵測：*.{attachments[0]} (+20%)")
         
-    # C. 連結偵測
     if links:
         final_score += 0.15
-        reasons.append(f"🔗 包含外部跳轉連結：`{links[0]}`")
+        reasons.append(f"惡意連結指向偵測 (+15%)")
         
     # D. 緊急壓力偵測
     if any(w in t_low for w in ["immediately", "3 days", "urgent", "立即", "三日內", "趕快"]):
@@ -144,14 +144,15 @@ with tab1:
             st.metric("Scam Probability", f"{s:.2f}%", delta="🔴 HIGH" if s > 70 else "🟢 SAFE")
             
             # --- 1. 判斷原因 (Explainable AI) ---
-            st.write("### 📝 判斷原因 (Explainable AI)")
-            # 使用 .get 確保名稱不對也不會當機
-            reasons = res.get("explanations", []) 
+            st.write("### 📝 判斷原因")
+            reasons = res.get("explanations", [])
             if reasons:
                 for r in reasons:
-                    st.markdown(f"* {r}")
+                    # 只顯示文字，不重複顯示加分百分比
+                    clean_reason = r.split(' (+')[0] if ' (+' in r else r
+                    st.markdown(f"* {clean_reason}")
             else:
-                st.write("🟢 AI 判定此訊息為常規溝通。")
+                st.write("🟢 未偵測到顯著風險特徵。")
 
             # --- 2. 判定類型標籤 ---
             s_type = res.get("type", "一般威脅")
@@ -162,19 +163,15 @@ with tab1:
             # --- 3. AI 可解釋性分析區塊 (XAI) ---
             st.write("### 🧠 AI 可解釋性分析 (XAI)")
             if reasons:
-                # 這裡要確保 HTML 字串完整，避免 SyntaxError
-                st.markdown(f'<div class="xai-box">{"<br>".join(reasons)}</div>', unsafe_allow_html=True)
+                # 這裡顯示帶有加權百分比的原始資料，模擬 SHAP 特徵貢獻度
+                xai_content = "<br>".join([f"📈 {r}" if '(+' in r else f"🔍 {r}" for r in reasons])
+                st.markdown(f'<div class="xai-box">{xai_content}</div>', unsafe_allow_html=True)
             else:
-                st.info("💡 目前未發現顯著的人為加權特徵。")
-
-            with st.expander("📝 檢視語意處理結果"):
-                st.info(res.get("trans", "無翻譯資料"))
-        else:
-            st.info("💡 選擇平台並輸入訊息後，AI 將拆解決策原因。")
-with tab2:
-    st.subheader("📂 批量威脅鑑定中心")
-    # 給予獨立 key，確保分頁切換時組件不會消失
-    up_csv = st.file_uploader("選擇上傳 CSV 檔案", type="csv", key="csv_file_up")
+                st.info("💡 目前純依賴 AI 語意模型判定。")
+            with tab2:
+                st.subheader("📂 批量威脅鑑定中心")
+                # 給予獨立 key，確保分頁切換時組件不會消失
+                up_csv = st.file_uploader("選擇上傳 CSV 檔案", type="csv", key="csv_file_up")
     
     if up_csv:
         df_b = pd.read_csv(up_csv)
