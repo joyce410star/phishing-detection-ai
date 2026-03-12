@@ -39,52 +39,60 @@ def load_and_train():
 tfidf_vec, ai_model = load_and_train()
 
 def analyze_scam(text, platform):
-    # --- A. 語意正規化 (你原本的內容) ---
     try:
         lang = detect(text)
         trans = GoogleTranslator(source='auto', target='en').translate(text) if lang != 'en' else text
     except: trans = text
     t_low = trans.lower()
     
-    # --- B. 定義判斷因子與權重 (你原本的內容) ---
     reasons = []
-    p_weights = {
-        "LINE / 社群": ["investment", "profit", "teacher", "group", "earn money", "飆股", "獲利"],
-        "SMS / 簡訊": ["package", "delivery", "failed", "unpaid", "verification", "領取", "未繳"],
-        "Email": ["urgent", "verify", "suspended", "account", "login", "credentials", "限制"]
-    }
-    hits = [w for w in p_weights[platform] if w in t_low or w in text]
-    links = re.findall(r'https?://([a-zA-Z0-9.-]+)', text)
-    prob = ai_model.predict_proba(tfidf_vec.transform([trans]))[0][1]
     
-    # --- C. 決策路徑追蹤 (你原本的內容) ---
+    # 1. 強化關鍵字庫 (這會直接影響「判斷原因」的顯示)
+    p_weights = {
+        "LINE / 社群": ["investment", "profit", "teacher", "group", "飆股", "獲利", "加LINE", "領取"],
+        "SMS / 簡訊": ["package", "delivery", "unpaid", "verification", "領取", "未繳", "罰鍰", "更新資料"],
+        "Email": ["invoice", "overdue", "payment", "suspended", "verify", "security", "發票", "欠費", "逾期", "限制"]
+    }
+    
+    # 2. 結構化偵測
+    links = re.findall(r'https?://([a-zA-Z0-9.-]+)', text)
+    # 偵測常見惡意附件副檔名
+    attachments = re.findall(r'\.(zip|exe|pdf|html|rar)', t_low)
+    
+    # 3. AI 原始分
+    prob = ai_model.predict_proba(tfidf_vec.transform([trans]))[0][1]
     final_score = prob
+    
+    # --- 關鍵：將判斷理由與加權掛鉤 ---
+    # A. 關鍵字加權
+    hits = [w for w in p_weights[platform] if w in t_low or w in text]
     if hits:
-        weight = 0.15 * len(set(hits))
-        final_score += weight
-        reasons.append(f"🎯 出現高風險關鍵詞：{', '.join(list(set(hits)))}")
-    if links:
+        final_score += 0.15 * len(set(hits))
+        reasons.append(f"🎯 命中風險關鍵詞：{', '.join(list(set(hits)))}")
+    
+    # B. 附件偵測 (針對你截圖中的 invoice_overdue.zip)
+    if attachments:
         final_score += 0.2
-        reasons.append(f"🔗 包含可疑外部連結：`{links[0]}`")
-    if any(w in t_low for w in ["urgent", "immediately", "24 hours", "立即", "趕快"]):
+        reasons.append(f"📦 偵測到可疑附件檔案：`*.{attachments[0]}`")
+        
+    # C. 連結偵測
+    if links:
+        final_score += 0.15
+        reasons.append(f"🔗 包含外部跳轉連結：`{links[0]}`")
+        
+    # D. 緊急壓力偵測
+    if any(w in t_low for w in ["immediately", "3 days", "urgent", "立即", "三日內", "趕快"]):
         final_score += 0.1
-        reasons.append("⏳ 要求緊急行動 (Urgency detected)")
+        reasons.append("⏳ 要求在限時內完成行動 (Urgency)")
 
-    # --- 🌟 重點：新增類型判定 (解決 KeyError) ---
-    scam_type = "一般威脅" 
-    if any(w in t_low for w in ["investment", "profit", "飆股", "投資"]):
-        scam_type = "投資詐騙"
-    elif any(w in t_low for w in ["package", "delivery", "包裹", "領取"]):
-        scam_type = "包裹/代收詐騙"
-    elif any(w in t_low for w in ["login", "verify", "password", "驗證"]):
-        scam_type = "帳據竊取"
+    # 4. 判定類型
+    scam_type = "一般威脅"
+    if any(w in t_low for w in ["invoice", "payment", "overdue"]): scam_type = "帳務/發票詐騙"
+    elif any(w in t_low for w in ["investment", "profit"]): scam_type = "投資詐騙"
 
-    # --- 🌟 重點：回傳時補上 "type" ---
-    # --- 在 analyze_scam 函式的最後面 ---
-    # 在 analyze_scam 函式的最後
     return {
         "final_score": min(final_score, 1.0) * 100,
-        "explanations": reasons,  # 確保這裡的 Key 叫做 explanations
+        "explanations": reasons,
         "trans": trans,
         "type": scam_type
     }
