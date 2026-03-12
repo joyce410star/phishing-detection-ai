@@ -39,55 +39,53 @@ def load_and_train():
 tfidf_vec, ai_model = load_and_train()
 
 def analyze_scam(text, platform):
-    # A. 語意正規化
+    # --- A. 語意正規化 (你原本的內容) ---
     try:
         lang = detect(text)
         trans = GoogleTranslator(source='auto', target='en').translate(text) if lang != 'en' else text
     except: trans = text
     t_low = trans.lower()
     
-    # B. 定義判斷因子與權重
+    # --- B. 定義判斷因子與權重 (你原本的內容) ---
     reasons = []
-    score_breakdown = []
-    
-    # 1. 關鍵詞命中檢查 (Keyword Importance)
     p_weights = {
         "LINE / 社群": ["investment", "profit", "teacher", "group", "earn money", "飆股", "獲利"],
         "SMS / 簡訊": ["package", "delivery", "failed", "unpaid", "verification", "領取", "未繳"],
         "Email": ["urgent", "verify", "suspended", "account", "login", "credentials", "限制"]
     }
-    
     hits = [w for w in p_weights[platform] if w in t_low or w in text]
-    
-    # 2. 連結風險偵測
     links = re.findall(r'https?://([a-zA-Z0-9.-]+)', text)
-    
-    # 3. AI 模型原始分
     prob = ai_model.predict_proba(tfidf_vec.transform([trans]))[0][1]
     
-    # C. 決策路徑追蹤 (Explainable AI Logic)
+    # --- C. 決策路徑追蹤 (你原本的內容) ---
     final_score = prob
-    
     if hits:
         weight = 0.15 * len(set(hits))
         final_score += weight
         reasons.append(f"🎯 出現高風險關鍵詞：{', '.join(list(set(hits)))}")
-    
     if links:
         final_score += 0.2
         reasons.append(f"🔗 包含可疑外部連結：`{links[0]}`")
-        
-    # 偵測是否有要求緊急行動
     if any(w in t_low for w in ["urgent", "immediately", "24 hours", "立即", "趕快"]):
         final_score += 0.1
         reasons.append("⏳ 要求緊急行動 (Urgency detected)")
 
+    # --- 🌟 重點：新增類型判定 (解決 KeyError) ---
+    scam_type = "一般威脅" 
+    if any(w in t_low for w in ["investment", "profit", "飆股", "投資"]):
+        scam_type = "投資詐騙"
+    elif any(w in t_low for w in ["package", "delivery", "包裹", "領取"]):
+        scam_type = "包裹/代收詐騙"
+    elif any(w in t_low for w in ["login", "verify", "password", "驗證"]):
+        scam_type = "帳據竊取"
+
+    # --- 🌟 重點：回傳時補上 "type" ---
     return {
         "final_score": min(final_score, 1.0) * 100,
-        "reasons": reasons, # 這就是評審要看的判斷原因
-        "trans": trans
+        "reasons": reasons,
+        "trans": trans,
+        "type": scam_type  # 加上這一行，報錯就會消失！
     }
-
 # 4. 主介面
 st.title("🛡️ 智慧資安：全通路詐騙 AI 偵測系統")
 st.markdown("##### 支援 Email、LINE、SMS 簡訊與社交媒體內容鑑定")
