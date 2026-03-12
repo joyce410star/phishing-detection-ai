@@ -96,15 +96,33 @@ st.markdown("##### 支援 Email、LINE、SMS 簡訊與社交媒體內容鑑定")
 
 tab1, tab2 = st.tabs(["🔍 單條訊息鑑定", "📂 CSV 批次分析"])
 
+# --- TAB 1: 單條訊息鑑定 ---
 with tab1:
     col_in, col_res = st.columns([1.2, 1])
     
     with col_in:
         st.subheader("📥 訊息內容輸入")
+        
+        # 1. 取得使用者選擇的平台
         platform = st.selectbox("請選擇訊息來源：", ["Email", "LINE / 社群", "SMS / 簡訊"])
-        u_input = st.text_area("請在此貼入訊息本文：", height=250, placeholder="例如：投資老師帶你穩賺30%，請點擊下方連結...")
+        
+        # 2. 根據平台設定動態提示詞 (Placeholder)
+        placeholders = {
+            "Email": "請在此貼入電子郵件本文，例如：您的帳戶存取權限已被暫時限制...",
+            "LINE / 社群": "例如：我是林老師，這是一個穩賺不賠的投資機會，請加入群組...",
+            "SMS / 簡訊": "例如：您有一件包裹未領取，請點擊連結查看詳情：http://bit.ly/fake..."
+        }
+        
+        # 3. 將動態提示詞帶入 text_area
+        u_input = st.text_area(
+            "請在此貼入訊息本文：", 
+            height=250, 
+            placeholder=placeholders[platform], # 這裡會根據選擇自動切換
+            key="single_input"
+        )
         
         if st.button("🚀 啟動跨平台 AI 鑑定"):
+            # ... 後續分析邏輯保持不變 ...
             if u_input and ai_model:
                 with st.spinner('🔐 正在分析決策路徑...'):
                     st.session_state.last_res = analyze_scam(u_input, platform)
