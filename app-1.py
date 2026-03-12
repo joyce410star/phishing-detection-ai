@@ -44,49 +44,47 @@ def analyze_scam(text, platform):
         lang = detect(text)
         trans = GoogleTranslator(source='auto', target='en').translate(text) if lang != 'en' else text
     except: trans = text
-    
     t_low = trans.lower()
-    explanations = []
     
-    # B. 平台特徵關鍵字庫
-    patterns = {
-        "LINE/社交": ["investment", "teacher", "profit", "group", "earn money", "crypto"],
-        "SMS/簡訊": ["package", "delivery", "failed", "unpaid", "click to view", "verification code"],
-        "通用釣魚": ["urgent", "verify", "suspended", "account", "login", "credentials"]
+    # B. 定義判斷因子與權重
+    reasons = []
+    score_breakdown = []
+    
+    # 1. 關鍵詞命中檢查 (Keyword Importance)
+    p_weights = {
+        "LINE / 社群": ["investment", "profit", "teacher", "group", "earn money", "飆股", "獲利"],
+        "SMS / 簡訊": ["package", "delivery", "failed", "unpaid", "verification", "領取", "未繳"],
+        "Email": ["urgent", "verify", "suspended", "account", "login", "credentials", "限制"]
     }
     
-    hits = [w for w in (patterns["LINE/社交"] + patterns["SMS/簡訊"] + patterns["通用釣魚"]) if w in t_low]
+    hits = [w for w in p_weights[platform] if w in t_low or w in text]
+    
+    # 2. 連結風險偵測
     links = re.findall(r'https?://([a-zA-Z0-9.-]+)', text)
     
-    # C. AI 預測與權重補償
+    # 3. AI 模型原始分
     prob = ai_model.predict_proba(tfidf_vec.transform([trans]))[0][1]
-    score = prob
     
-    # D. 跨平台加權邏輯 (重點：針對不同來源調整權重)
-    if platform == "LINE / 社群":
-        if any(w in t_low for w in ["investment", "profit", "teacher"]):
-            score += 0.3
-            explanations.append("📈 **偵測到社交平台典型投資詐騙語法 (+30%)**")
-    elif platform == "SMS / 簡訊":
-        if any(w in t_low for w in ["package", "delivery", "unpaid"]):
-            score += 0.25
-            explanations.append("📦 **偵測到簡訊典型包裹/欠費詐騙特徵 (+25%)**")
+    # C. 決策路徑追蹤 (Explainable AI Logic)
+    final_score = prob
+    
+    if hits:
+        weight = 0.15 * len(set(hits))
+        final_score += weight
+        reasons.append(f"🎯 出現高風險關鍵詞：{', '.join(list(set(hits)))}")
     
     if links:
-        score += 0.2
-        explanations.append(f"🔗 **包含可疑連結指向:** `{links[0]}` (+20%)")
-    
-    # 判定詐騙類型
-    scam_type = "一般釣魚"
-    if any(w in t_low for w in ["investment", "profit"]): scam_type = "投資詐騙"
-    elif any(w in t_low for w in ["package", "delivery"]): scam_type = "包裹/代收詐騙"
-    elif any(w in t_low for w in ["login", "verify"]): scam_type = "帳據竊取"
+        final_score += 0.2
+        reasons.append(f"🔗 包含可疑外部連結：`{links[0]}`")
+        
+    # 偵測是否有要求緊急行動
+    if any(w in t_low for w in ["urgent", "immediately", "24 hours", "立即", "趕快"]):
+        final_score += 0.1
+        reasons.append("⏳ 要求緊急行動 (Urgency detected)")
 
     return {
-        "final_score": min(score, 1.0) * 100,
-        "type": scam_type,
-        "explanations": explanations,
-        "hits": hits,
+        "final_score": min(final_score, 1.0) * 100,
+        "reasons": reasons, # 這就是評審要看的判斷原因
         "trans": trans
     }
 
@@ -133,10 +131,21 @@ with tab1:
         if st.session_state.last_res:
             res = st.session_state.last_res
             s = res["final_score"]
-            status = "🔴 HIGH" if s > 70 else ("🟡 MED" if s >= 40 else "✅ SAFE")
             
             st.subheader("🕵️ 鑑定報告")
-            st.metric("Scam Probability", f"{s:.2f}%", delta=status)
+            st.metric("Scam Probability", f"{s:.2f}%")
+            
+            # --- 新增：判斷原因區塊 ---
+            st.write("### 📝 判斷原因 (Explainable AI)")
+            if res["reasons"]:
+                for reason in res["reasons"]:
+                    st.markdown(f"* {reason}")
+            else:
+                st.write("🟢 AI 基於整體語意判定為安全，未命中特定惡意特徵。")
+            # ----------------------------------------------
+            
+            with st.expander("📝 檢視語意處理結果"):
+                st.info(res["trans"])
             
             # 顯示類型標籤
             color = "#ef4444" if s > 70 else "#f59e0b"
