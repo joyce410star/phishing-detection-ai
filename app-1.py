@@ -81,9 +81,10 @@ def analyze_scam(text, platform):
 
     # --- 🌟 重點：回傳時補上 "type" ---
     # --- 在 analyze_scam 函式的最後面 ---
+    # 在 analyze_scam 函式的最後
     return {
         "final_score": min(final_score, 1.0) * 100,
-        "explanations": reasons, # 把原本的 reasons 改名為 explanations
+        "explanations": reasons,  # 確保這裡的 Key 叫做 explanations
         "trans": trans,
         "type": scam_type
     }
@@ -134,13 +135,17 @@ with tab1:
             st.subheader("🕵️ 鑑定報告")
             st.metric("Scam Probability", f"{s:.2f}%")
             
-            # --- 新增：判斷原因區塊 ---
-            st.write("### 📝 判斷原因 (Explainable AI)")
-            if res["reasons"]:
-                for reason in res["reasons"]:
-                    st.markdown(f"* {reason}")
-            else:
-                st.write("🟢 AI 基於整體語意判定為安全，未命中特定惡意特徵。")
+            # --- 判斷原因區塊 (修正後的第 139 行) ---
+        st.write("### 📝 判斷原因 (Explainable AI)")
+        
+        # 使用 .get() 安全取值，即使名稱寫錯也不會崩潰
+        reasons_to_show = res.get("explanations", []) 
+        
+        if reasons_to_show:
+            for r in reasons_to_show:
+                st.markdown(f"* {r}")
+        else:
+            st.write("🟢 AI 基於整體語意判定為安全。")
             # ----------------------------------------------
             
             with st.expander("📝 檢視語意處理結果"):
