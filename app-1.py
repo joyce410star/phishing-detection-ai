@@ -80,11 +80,12 @@ def analyze_scam(text, platform):
         scam_type = "帳據竊取"
 
     # --- 🌟 重點：回傳時補上 "type" ---
+    # --- 在 analyze_scam 函式的最後面 ---
     return {
         "final_score": min(final_score, 1.0) * 100,
-        "reasons": reasons,
+        "explanations": reasons, # 把原本的 reasons 改名為 explanations
         "trans": trans,
-        "type": scam_type  # 加上這一行，報錯就會消失！
+        "type": scam_type
     }
 # 4. 主介面
 st.title("🛡️ 智慧資安：全通路詐騙 AI 偵測系統")
