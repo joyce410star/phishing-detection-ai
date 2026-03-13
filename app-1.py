@@ -92,7 +92,7 @@ def analyze_scam(text, platform):
     
     current_score = (raw_prob_val * 0.4) + (rule_bonus * 0.6)
     if hits:
-        reasons.append(f"命中風險關鍵詞組合 (+{rule_bonus}%)")
+        reasons.append(f"🎯 偵測到風險關鍵字：{', '.join(u_hits)} (+{rule_bonus}%)")
 
     # B. 偵測加權 (0-100 單位)
     if attachments:
@@ -100,7 +100,7 @@ def analyze_scam(text, platform):
         reasons.append(f"偵測到可疑附件檔案 (*.{attachments[0]}) (+20%)")
     if links:
         current_score += 15
-        reasons.append(f"包含外部導引連結 (+15%)")
+        reasons.append(f"🔗 包含可疑外部連結：`{links[0]}` (+15%)")
     if any(w in t_low for w in ["immediately", "3 days", "urgent", "立即", "三日內", "趕快"]):
         current_score += 10
         reasons.append("要求在限時內完成行動 (Urgency) (+10%)")
