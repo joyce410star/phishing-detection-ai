@@ -38,6 +38,12 @@ def load_and_train():
 
 tfidf_vec, ai_model = load_and_train()
 
+P_WEIGHTS = {
+    "LINE / 社群": ["investment", "profit", "teacher", "group", "飆股", "獲利", "加LINE", "領取"],
+    "SMS / 簡訊": ["package", "delivery", "unpaid", "verification", "領取", "未繳", "罰鍰", "更新資料"],
+    "Email": ["invoice", "overdue", "payment", "suspended", "verify", "security", "unusual", "login", "activity", "identity","發票", "欠費", "逾期", "限制"]
+}
+
 def analyze_scam(text, platform):
     try:
         lang = detect(text)
@@ -72,12 +78,8 @@ def analyze_scam(text, platform):
 
     current_score += trust_score
     
-    # 1. 強化關鍵字庫 (這會直接影響「判斷原因」的顯示)
-    p_weights = {
-        "LINE / 社群": ["investment", "profit", "teacher", "group", "飆股", "獲利", "加LINE", "領取"],
-        "SMS / 簡訊": ["package", "delivery", "unpaid", "verification", "領取", "未繳", "罰鍰", "更新資料"],
-        "Email": ["invoice", "overdue", "payment", "suspended", "verify", "security", "unusual", "login", "activity", "identity","發票", "欠費", "逾期", "限制"]
-    }
+    
+
     
     # 2. 結構化偵測
     links = re.findall(r'https?://([a-zA-Z0-9.-]+)', text)
@@ -270,7 +272,7 @@ with tab1:
                 
                 # 🌟 進階：自動高亮命中到的關鍵字 (讓評審驚艷)
                 # 假設我們從後端把 hits 傳出來
-                for word in p_weights[platform]:
+                for word in P_WEIGHTS[platform]:
                     if word in processed_text:
                         processed_text = processed_text.replace(word, f"**{word}**")
                         
