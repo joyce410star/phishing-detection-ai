@@ -58,31 +58,7 @@ def analyze_scam(text, platform):
         "您的包裹寄送失敗": "Your package delivery failed. Please update your information to retry."
     }
 
-    try:
-        # 嘗試在線翻譯
-        translated = GoogleTranslator(source='auto', target='en').translate(text)
-        if translated and translated.strip().lower() != text.strip().lower():
-            trans = translated
-            status_msg = "非英語內容，已完成正規化翻譯"
-        else:
-            # 💡 在線翻譯失敗，進入備援模式
-            for key, val in demo_samples.items():
-                if key in text:
-                    trans = val
-                    status_msg = "翻譯引擎離線：已啟動本地語意緩存 (Demo Mode)"
-                    break
-            if trans == text and re.search(r'[\u4e00-\u9fff]', text):
-                status_msg = "⚠️ 翻譯引擎異常且無備援語意 (可能影響判定準確度)"
-    except:
-        # 全面斷網時的最後防線
-        for key, val in demo_samples.items():
-            if key in text:
-                trans = val
-                status_msg = "網路異常：已啟動本地語意緩存 (Offline Mode)"
-                break
-
-    display_text = f"【語意分析：{status_msg}】\n\n{trans}"
-    t_low = trans.lower()
+    
     
     # --- 後續邏輯保持不變 ---
     
@@ -175,9 +151,8 @@ def analyze_scam(text, platform):
     
     return {
         "final_score": max(0, min(current_score, 100.0)),
-        "raw_prob": raw_prob_val,
+        "raw_prob": raw_prob_val, # 雖然這封信 AI 分會變低，但沒關係，規則加權會補回來
         "explanations": reasons,
-        "trans": display_text, 
         "type": scam_type,
         "detected_keywords": list(set(hits))
     }
@@ -199,9 +174,9 @@ with tab1:
         
         # 2. 根據平台設定動態提示詞 (Placeholder)
         placeholders = {
-            "Email": "請在此貼入電子郵件本文，例如：您的帳戶存取權限已被暫時限制...",
-            "LINE / 社群": "例如：我是林老師，這是一個穩賺不賠的投資機會，請加入群組...",
-            "SMS / 簡訊": "例如：您有一件包裹未領取，請點擊連結查看詳情：http://bit.ly/fake..."
+           "Email": ["invoice", "payment", "security", "unusual", "login", "限制", "異常", "驗證", "凍結", "暫停", "身份確認", "資產安全"],
+    "LINE / 社群": ["investment", "profit", "飆股", "獲利", "加LINE", "群組", "老師", "穩賺不賠", "內線"],
+    "SMS / 簡訊": ["package", "delivery", "領取", "未繳", "罰鍰", "更新資料", "異常登入", "積分兌換"]
         }
         
         # 3. 將動態提示詞帶入 text_area
@@ -291,8 +266,7 @@ with tab1:
                 st.markdown(kw_html, unsafe_allow_html=True)
                 st.write("") 
 
-            with st.expander("📝 檢視語意處理結果"):
-                raw_trans = res.get("trans", "") 
+            
                 platform_keywords = P_WEIGHTS.get(platform, [])
                 for word in platform_keywords:
                     if word.lower() in raw_trans.lower():
