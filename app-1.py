@@ -115,9 +115,16 @@ def analyze_scam(text, platform):
     # D. 針對帳號安全 (針對你目前的測試內容)
     elif any(w in t_low for w in ["suspended", "verify", "security", "login", "安全", "驗證", "凍結"]):
         scam_type = "帳據安全威脅"
+    # --- 🌟 核心修正：動態上限控制 (加在 return 之前) ---
+    # 如果這封信「沒網址」且「沒附件」，就算語氣再像詐騙，最高也只給 80 分
+    if not links and not attachments:
+        if final_score > 80:
+            final_score = 80.0
+            # 在理由清單最前面加入說明，增加專業感
+            reasons.insert(0, "⚠️ 內容具備詐騙特徵，但未發現立即性惡意載體 (如連結/附件)，降低風險評等。")
     return {
-        "final_score": min(final_score, 1.0) * 100,
-        "raw_prob": prob * 100,  # 🌟 記得加這一行，把原始 AI 分數傳出來
+        "final_score": min(final_score, 100.0),
+        "raw_prob": prob * 100,
         "explanations": reasons,
         "trans": trans,
         "type": scam_type
