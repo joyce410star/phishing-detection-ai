@@ -38,10 +38,11 @@ def load_and_train():
 
 tfidf_vec, ai_model = load_and_train()
 
+
 P_WEIGHTS = {
-    "LINE / 社群": ["investment", "profit", "teacher", "group", "飆股", "獲利", "加LINE", "領取"],
-    "SMS / 簡訊": ["package", "delivery", "unpaid", "verification", "領取", "未繳", "罰鍰", "更新資料"],
-    "Email": ["invoice", "overdue", "payment", "suspended", "verify", "security", "unusual", "login", "activity", "identity","發票", "欠費", "逾期", "限制"]
+    "Email": ["invoice", "payment", "security", "unusual", "login", "限制", "異常", "驗證", "凍結", "暫停", "身份確認", "資產安全"],
+    "LINE / 社群": ["investment", "profit", "飆股", "獲利", "加LINE", "群組", "老師", "穩賺不賠", "內線"],
+    "SMS / 簡訊": ["package", "delivery", "領取", "未繳", "罰鍰", "更新資料", "異常登入", "積分兌換"]
 }
 
 
@@ -59,6 +60,9 @@ def analyze_scam(text, platform):
     }
 
     
+
+    display_text = f"【語意分析：{status_msg}】\n\n{trans}"
+    t_low = trans.lower()
     
     # --- 後續邏輯保持不變 ---
     
@@ -174,9 +178,9 @@ with tab1:
         
         # 2. 根據平台設定動態提示詞 (Placeholder)
         placeholders = {
-           "Email": ["invoice", "payment", "security", "unusual", "login", "限制", "異常", "驗證", "凍結", "暫停", "身份確認", "資產安全"],
-    "LINE / 社群": ["investment", "profit", "飆股", "獲利", "加LINE", "群組", "老師", "穩賺不賠", "內線"],
-    "SMS / 簡訊": ["package", "delivery", "領取", "未繳", "罰鍰", "更新資料", "異常登入", "積分兌換"]
+            "Email": "請在此貼入電子郵件本文，例如：您的帳戶存取權限已被暫時限制...",
+            "LINE / 社群": "例如：我是林老師，這是一個穩賺不賠的投資機會，請加入群組...",
+            "SMS / 簡訊": "例如：您有一件包裹未領取，請點擊連結查看詳情：http://bit.ly/fake..."
         }
         
         # 3. 將動態提示詞帶入 text_area
@@ -267,12 +271,6 @@ with tab1:
                 st.write("") 
 
             
-                platform_keywords = P_WEIGHTS.get(platform, [])
-                for word in platform_keywords:
-                    if word.lower() in raw_trans.lower():
-                        import re
-                        raw_trans = re.sub(f"({re.escape(word)})", r"**\1**", raw_trans, flags=re.IGNORECASE)
-                st.markdown(raw_trans)
 with tab2:
     st.subheader("📂 批量威脅鑑定中心")
     
