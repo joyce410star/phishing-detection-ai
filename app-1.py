@@ -265,15 +265,20 @@ with tab1:
 
             # 在 col_res 的 expander 區塊中修改
             with st.expander("📝 檢視語意處理結果"):
-                processed_text = res.get("trans", "")
+            # 取得處理過的文字
+                raw_trans = res.get("trans", "")
                 
-                # 🌟 進階：自動高亮命中到的關鍵字 (讓評審驚艷)
-                # 假設我們從後端把 hits 傳出來
-                for word in P_WEIGHTS[platform]:
-                    if word in processed_text:
-                        processed_text = processed_text.replace(word, f"**{word}**")
-                        
-                st.info(processed_text)
+                # 在顯示前，將關鍵字高亮 (Bold)
+                platform_keywords = P_WEIGHTS.get(platform, [])
+                for word in platform_keywords:
+                    # 忽略大小寫進行替換
+                    if word.lower() in raw_trans.lower():
+                        # 這裡用正則表達式可以避免破壞連結內容
+                        import re
+                        raw_trans = re.sub(f"({word})", r"**\1**", raw_trans, flags=re.IGNORECASE)
+                
+                # 使用 markdown 顯示，才會出現粗體效果
+                st.markdown(raw_trans)
 with tab2:
     st.subheader("📂 批量威脅鑑定中心")
     
