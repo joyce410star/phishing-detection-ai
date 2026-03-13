@@ -89,11 +89,7 @@ def analyze_scam(text, platform):
         final_score += 0.1
         reasons.append("要求在限時內完成行動 (Urgency) (+10%)")
         
-    # D. 緊急壓力偵測
-    if any(w in t_low for w in ["immediately", "3 days", "urgent", "立即", "三日內", "趕快"]):
-        final_score += 0.1
-        reasons.append("⏳ 要求在限時內完成行動 (Urgency)")
-
+    
     # 4. 判定類型
     scam_type = "一般威脅"
     if any(w in t_low for w in ["invoice", "payment", "overdue"]): scam_type = "帳務/發票詐騙"
