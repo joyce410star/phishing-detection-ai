@@ -45,23 +45,30 @@ P_WEIGHTS = {
 }
 
 def analyze_scam(text, platform):
-    # 🌟 1. 強制語意正規化 (確保翻譯)
+    # 🌟 1. 強化版語意正規化 (加入 Debug 追蹤)
+    trans = text # 預設為原文
+    status_msg = "偵測為英語內容"
+    
     try:
-        # 強制使用 Google Translator 轉成英文
-        # 我們不再比對 text，而是直接使用 trans
-        trans = GoogleTranslator(source='auto', target='en').translate(text)
+        # 強制進行翻譯
+        translated = GoogleTranslator(source='auto', target='en').translate(text)
         
-        # 建立顯示內容：標註偵測到的狀態
-        # 如果翻譯後的內容跟原文不一樣，代表翻譯成功
-        if trans.strip().lower() != text.strip().lower():
-            display_text = f"【語意分析：偵測為非英語內容，已完成正規化翻譯】\n\n{trans}"
+        # 檢查翻譯是否真的有產生變化
+        if translated and translated.strip().lower() != text.strip().lower():
+            trans = translated
+            status_msg = "非英語內容，已完成正規化翻譯"
         else:
-            display_text = f"【語意分析：偵測為英語內容，維持原始文本分析】\n\n{text}"
-            
+            # 如果翻譯出來跟原文一樣，檢查是不是因為包含中文但沒翻成功
+            if re.search(r'[\u4e00-\u9fff]', text):
+                status_msg = "偵測到中文但翻譯引擎未回應 (維持原文分析)"
+            else:
+                status_msg = "偵測為英語內容，維持原始文本分析"
+                
     except Exception as e:
-        # 如果翻譯發生錯誤 (例如網路問題)
+        status_msg = f"語意引擎異常: {str(e)}"
         trans = text
-        display_text = f"【系統警告：語意處理引擎暫時異常】\n\n{text}"
+
+    display_text = f"【語意分析：{status_msg}】\n\n{trans}"
 
     # 🌟 2. 核心分析：後續邏輯必須用 trans 
     t_low = trans.lower()
@@ -157,7 +164,7 @@ def analyze_scam(text, platform):
         "final_score": max(0, min(current_score, 100.0)),
         "raw_prob": raw_prob_val,
         "explanations": reasons,
-        "trans": display_text,  # <--- 確保這行是傳 display_text
+        "trans": display_text, 
         "type": scam_type,
         "detected_keywords": list(set(hits))
     }
