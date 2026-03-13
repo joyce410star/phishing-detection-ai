@@ -104,12 +104,14 @@ def analyze_scam(text, platform):
     # --- 優化後的加權邏輯 (避免分數暴走) ---
     
     # 1. 關鍵字遞減加權 (不再是死板的 15% * n)
+    # 🌟 修改：讓關鍵字更有份量
     hits = [w for w in P_WEIGHTS[platform] if w in t_low or w in text]
     rule_bonus = 0
     if hits:
         u_hits = list(set(hits))
-        rule_bonus = 10 + (len(u_hits) - 1) * 3
-        rule_bonus = min(25, rule_bonus)
+        # 基礎分從 20 開始，每個字加 5，最高上限拉到 50
+        rule_bonus = 20 + (len(u_hits) - 1) * 5
+        rule_bonus = min(50, rule_bonus)
     
     current_score = (raw_prob_val * 0.4) + (rule_bonus * 0.6)
     if hits:
@@ -152,6 +154,11 @@ def analyze_scam(text, platform):
     # D. 針對帳號安全 (針對你目前的測試內容)
     elif any(w in t_low for w in ["suspended", "verify", "security", "login", "安全", "驗證", "凍結"]):
         scam_type = "帳據安全威脅"
+
+    if scam_type == "投資詐騙":
+        if any(w in text for w in ["老師", "助教", "獲利", "群組", "飆股", "助教"]):
+            current_score += 25  # 直接加 25 分，突破安全線
+            reasons.append("🚨 典型社群投資詐騙話術偵測 (+25%)")
     
     return {
         "final_score": max(0, min(current_score, 100.0)),
