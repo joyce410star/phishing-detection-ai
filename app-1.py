@@ -261,10 +261,7 @@ with tab1:
                 # 用 st.status 或標籤方式顯示
                 kw_html = "".join([f"<span style='background:#f3f4f6; color:#374151; padding:2px 8px; border-radius:12px; margin-right:5px; font-size:0.8rem;'>#{w}</span>" for w in kws])
                 st.markdown(kw_html, unsafe_allow_html=True)
-                st.write("") # 留一點空白
-
-            with st.expander("📝 檢視語意處理結果"):
-                st.info(res.get("trans", ""))    
+                st.write("") # 留一點空白   
 
             # 在 col_res 的 expander 區塊中修改
             with st.expander("📝 檢視語意處理結果"):
