@@ -95,7 +95,7 @@ def analyze_scam(text, platform):
     # --- 優化後的加權邏輯 (避免分數暴走) ---
     
     # 1. 關鍵字遞減加權 (不再是死板的 15% * n)
-    hits = [w for w in p_weights[platform] if w in t_low or w in text]
+    hits = [w for w in P_WEIGHTS[platform] if w in t_low or w in text]
     rule_bonus = 0
     if hits:
         u_hits = list(set(hits))
