@@ -46,6 +46,7 @@ def analyze_scam(text, platform):
     t_low = trans.lower()
     
     reasons = []
+    current_score = 0  # 🌟 關鍵修正：先初始化變數，避免 UnboundLocalError
 
     # --- 新增：信任因子（扣分制） ---
     trust_score = 0
