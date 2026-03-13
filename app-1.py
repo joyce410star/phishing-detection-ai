@@ -205,7 +205,13 @@ with tab1:
             s = res.get("final_score", 0)
             
             st.subheader("🕵️ 鑑定報告")
-            st.metric("Scam Probability", f"{s:.2f}%", delta="🚨 HIGH" if s > 70 else "🟢 SAFE")
+            st.metric("Scam Probability", f"{s:.2f}%",
+            if s > 75:
+            st.error("### 🛑 高度危險：建議立即刪除並封鎖")
+            elif s > 40:
+                st.warning("### ⚠️ 中度風險：請務必核實來源")
+            else:
+                st.success("### ✅ 安全：未發現明顯威脅"))
             # --- 🌟 決策組成分析 (垂直穩定版：取代原本的 columns) ---
             st.write("### ⚖️ 決策組成分析")
             raw_ai = res.get("raw_prob", 50)  # 取得 AI 原始分
