@@ -46,6 +46,20 @@ def analyze_scam(text, platform):
     t_low = trans.lower()
     
     reasons = []
+
+    # --- 新增：信任因子（扣分制） ---
+    trust_score = 0
+    # 如果信件開頭很正式，或是結尾有標準退訂/版權宣告
+    if any(w in t_low for w in ["dear customer", "regards", "copyright", "unsubscribe"]):
+        trust_score -= 15
+        reasons.append("✅ 包含正式商務禮儀或法律宣告 (減輕風險)")
+
+    # 如果信件長度很長（詐騙通常短小精悍，講完重點就叫你點連結）
+    if len(text) > 500:
+        trust_score -= 10
+        reasons.append("📝 內容敘述詳盡，與一般釣魚簡訊特徵不符 (減輕風險)")
+
+    current_score += trust_score
     
     # 1. 強化關鍵字庫 (這會直接影響「判斷原因」的顯示)
     p_weights = {
@@ -75,7 +89,7 @@ def analyze_scam(text, platform):
         rule_bonus = 10 + (len(u_hits) - 1) * 3
         rule_bonus = min(25, rule_bonus)
     
-    current_score = raw_prob_val + rule_bonus
+    current_score = (raw_prob_val * 0.4) + (rule_bonus * 0.6)
     if hits:
         reasons.append(f"命中風險關鍵詞組合 (+{rule_bonus}%)")
 
@@ -176,14 +190,13 @@ with tab1:
             raw_ai = res.get("raw_prob", 50)  # 取得 AI 原始分
             rule_weight = max(0, s - raw_ai)  # 計算規則加分
             
-            # 1. 顯示 AI 模型比重
-            st.caption(f"🤖 AI 語意模型核心判定：{raw_ai:.1f}%")
-            st.progress(min(1.0, raw_ai / 100))
-            
-            # 2. 顯示專家規則加權 (只有在有加分時才顯示，視覺更精簡)
+           # 在 col_res 顯示比重條的地方
+            st.caption(f"🤖 AI 模型貢獻 (40% 比重)：{(raw_ai * 0.4):.1f}%")
+            st.progress(min(1.0, (raw_ai * 0.4) / 40)) # 以 40 為分母
+
             if rule_weight > 0:
-                st.caption(f"🛡️ 專家規則特徵加權：+{rule_weight:.1f}%")
-                st.progress(min(1.0, rule_weight / 100))
+                st.caption(f"🛡️ 專家規則貢獻 (60% 比重)：{(rule_weight * 0.6):.1f}%")
+                st.progress(min(1.0, (rule_weight * 0.6) / 60))
             
             st.write("---") # 分隔線，讓下方判斷原因更清晰
 
