@@ -51,7 +51,7 @@ def analyze_scam(text, platform):
     p_weights = {
         "LINE / 社群": ["investment", "profit", "teacher", "group", "飆股", "獲利", "加LINE", "領取"],
         "SMS / 簡訊": ["package", "delivery", "unpaid", "verification", "領取", "未繳", "罰鍰", "更新資料"],
-        "Email": ["invoice", "overdue", "payment", "suspended", "verify", "security", "發票", "欠費", "逾期", "限制"]
+        "Email": ["invoice", "overdue", "payment", "suspended", "verify", "security", "unusual", "login", "activity", "identity","發票", "欠費", "逾期", "限制"]
     }
     
     # 2. 結構化偵測
