@@ -206,11 +206,11 @@ with tab1:
             
             # 🌟 1. 風險燈號 (確保這裡的 if 跟下方的 st.subheader 對齊)
             if s > 75:
-                st.error("### 🛑 高度危險：建議立即刪除並封鎖")
+                st.error("** 🛑 高度危險：建議立即刪除並封鎖")
             elif s > 40:
-                st.warning("### ⚠️ 中度風險：請務必核實來源")
+                st.warning("** ⚠️ 中度風險：請務必核實來源")
             else:
-                st.success("### ✅ 安全：未發現明顯威脅")
+                st.success("** ✅ 安全：未發現明顯威脅")
 
             # 2. 原本的鑑定報告內容
             st.subheader("🕵️ 鑑定報告")
