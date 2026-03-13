@@ -41,9 +41,17 @@ tfidf_vec, ai_model = load_and_train()
 def analyze_scam(text, platform):
     try:
         lang = detect(text)
-        trans = GoogleTranslator(source='auto', target='en').translate(text) if lang != 'en' else text
+        # 🌟 修改：不論是否翻譯，都記錄偵測到的語言
+        lang_name = "中文" if lang == 'zh-cn' or lang == 'zh-tw' else "英文"
+        
+        if lang != 'en':
+            trans = GoogleTranslator(source='auto', target='en').translate(text)
+            display_text = f"【偵測語言：{lang_name}】\n--- 翻譯結果 ---\n{trans}"
+        else:
+            trans = text
+            display_text = f"【偵測語言：英文】\n--- 原始文本 ---\n{text}"
     except: trans = text
-    t_low = trans.lower()
+    display_text = text
     
     reasons = []
     current_score = 0  # 🌟 關鍵修正：先初始化變數，避免 UnboundLocalError
@@ -137,8 +145,9 @@ def analyze_scam(text, platform):
         "final_score": min(current_score, 100.0), 
         "raw_prob": raw_prob_val,
         "explanations": reasons,
-        "trans": trans,
-        "type": scam_type
+        "trans":display_text,
+        "type": scam_type,
+        "detected_keywords": list(set(hits))  # 🌟 加上這一行
     }
 # 4. 主介面
 st.title("🛡️ 智慧資安：全通路詐騙 AI 偵測系統")
@@ -241,8 +250,29 @@ with tab1:
             else:
                 st.info("💡 目前純依賴 AI 語意模型判定。")
 
+            # 🌟 新增：顯示系統提取的關鍵字標籤
+            kws = res.get("detected_keywords", [])
+            if kws:
+                st.write("🔍 **系統特徵提取：**")
+                # 用 st.status 或標籤方式顯示
+                kw_html = "".join([f"<span style='background:#f3f4f6; color:#374151; padding:2px 8px; border-radius:12px; margin-right:5px; font-size:0.8rem;'>#{w}</span>" for w in kws])
+                st.markdown(kw_html, unsafe_allow_html=True)
+                st.write("") # 留一點空白
+
             with st.expander("📝 檢視語意處理結果"):
-                st.info(res.get("trans", ""))
+                st.info(res.get("trans", ""))    
+
+            # 在 col_res 的 expander 區塊中修改
+            with st.expander("📝 檢視語意處理結果"):
+                processed_text = res.get("trans", "")
+                
+                # 🌟 進階：自動高亮命中到的關鍵字 (讓評審驚艷)
+                # 假設我們從後端把 hits 傳出來
+                for word in p_weights[platform]:
+                    if word in processed_text:
+                        processed_text = processed_text.replace(word, f"**{word}**")
+                        
+                st.info(processed_text)
 with tab2:
     st.subheader("📂 批量威脅鑑定中心")
     
