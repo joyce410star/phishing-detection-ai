@@ -267,17 +267,17 @@ with tab1:
             # 在 col_res 的 expander 區塊中修改
            with st.expander("📝 檢視語意處理結果"):
             # 🌟 關鍵修正：確保變數名稱從 res 抓出來並賦值給 raw_trans
-            raw_trans = res.get("trans", "") 
+                raw_trans = res.get("trans", "") 
             
             # 這裡的高亮邏輯
-            platform_keywords = P_WEIGHTS.get(platform, [])
-            for word in platform_keywords:
-                if word.lower() in raw_trans.lower():
-                    import re
-                    # 使用正則表達式高亮，並忽略大小寫
-                    raw_trans = re.sub(f"({re.escape(word)})", r"**\1**", raw_trans, flags=re.IGNORECASE)
-            
-            st.markdown(raw_trans)
+                platform_keywords = P_WEIGHTS.get(platform, [])
+                for word in platform_keywords:
+                    if word.lower() in raw_trans.lower():
+                        import re
+                        # 使用正則表達式高亮，並忽略大小寫
+                        raw_trans = re.sub(f"({re.escape(word)})", r"**\1**", raw_trans, flags=re.IGNORECASE)
+                
+                st.markdown(raw_trans)
 with tab2:
     st.subheader("📂 批量威脅鑑定中心")
     
