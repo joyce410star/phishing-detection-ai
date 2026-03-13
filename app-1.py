@@ -185,15 +185,22 @@ with tab1:
             st.write("---") # 分隔線，讓下方判斷原因更清晰
 
             # --- 1. 判斷原因 (這部分接在下方) ---
+            # --- 修改後的判斷原因顯示區塊 ---
             st.write("### 📝 判斷原因")
+            
+            # 1. 先從 res 抓取資料，並給予預設值避免 NameError
             full_reasons = res.get("explanations", [])
+            raw_ai_score = res.get("raw_prob", 0)  # 🌟 補上這一行！
+            
+            # 2. 開始顯示理由
             if full_reasons:
                 for r in full_reasons:
-                    # 使用 split 取出 (+ 之前的文字，讓結論變乾淨
                     clean_reason = r.split(' (+')[0] if ' (+' in r else r
                     st.markdown(f"* {clean_reason}")
+            
+            # 3. 執行剛才新增的 AI 貢獻邏輯
             if raw_ai_score > 60 and not full_reasons:
-                st.markdown("* 🤖 **AI 語意模型偵測到與已知詐騙郵件高度相似的語氣與模式。**")
+                st.markdown("* 🤖 **AI 語意模型偵測到高度異常模式。**")
             elif not full_reasons:
                 st.write("🟢 未偵測到顯著風險特徵。")
 
