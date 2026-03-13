@@ -247,37 +247,30 @@ with tab1:
             st.markdown(f"**判定類型：** <span class='platform-tag' style='background:{t_color}'>{s_type}</span>", unsafe_allow_html=True)
 
             # --- 2. AI 可解釋性分析 (XAI) (專業化：保留百分比) ---
+            # --- 確保這幾行跟上面的 if full_reasons: 同一排垂直對齊 ---
             st.write("### 🧠 AI 可解釋性分析 (XAI)")
             if full_reasons:
-                # 這裡保留原始帶有 (+XX%) 的文字，放在藍色框框裡
                 xai_content = "<br>".join([f"📈 {r}" for r in full_reasons])
                 st.markdown(f'<div class="xai-box">{xai_content}</div>', unsafe_allow_html=True)
             else:
                 st.info("💡 目前純依賴 AI 語意模型判定。")
 
-            # 🌟 新增：顯示系統提取的關鍵字標籤
-                kws = res.get("detected_keywords", [])
-                if kws:
-                    st.write("🔍 **系統特徵提取：**")
-                    # 用 st.status 或標籤方式顯示
-                    kw_html = "".join([f"<span style='background:#f3f4f6; color:#374151; padding:2px 8px; border-radius:12px; margin-right:5px; font-size:0.8rem;'>#{w}</span>" for w in kws])
-                    st.markdown(kw_html, unsafe_allow_html=True)
-                    st.write("") # 留一點空白   
+            # 🌟 重點：這幾行必須「往左推」，跟上面的 if 同一排
+            kws = res.get("detected_keywords", [])
+            if kws:
+                st.write("🔍 **系統特徵提取：**")
+                kw_html = "".join([f"<span style='background:#f3f4f6; color:#374151; padding:2px 8px; border-radius:12px; margin-right:5px; font-size:0.8rem;'>#{w}</span>" for w in kws])
+                st.markdown(kw_html, unsafe_allow_html=True)
+                st.write("") 
 
-                # 在 col_res 的 expander 區塊中修改
-                with st.expander("📝 檢視語意處理結果"):
-                # 🌟 關鍵修正：確保變數名稱從 res 抓出來並賦值給 raw_trans
-                    raw_trans = res.get("trans", "") 
-                
-                # 這裡的高亮邏輯
-                    platform_keywords = P_WEIGHTS.get(platform, [])
-                    for word in platform_keywords:
-                        if word.lower() in raw_trans.lower():
-                            import re
-                            # 使用正則表達式高亮，並忽略大小寫
-                            raw_trans = re.sub(f"({re.escape(word)})", r"**\1**", raw_trans, flags=re.IGNORECASE)
-                    
-                    st.markdown(raw_trans)
+            with st.expander("📝 檢視語意處理結果"):
+                raw_trans = res.get("trans", "") 
+                platform_keywords = P_WEIGHTS.get(platform, [])
+                for word in platform_keywords:
+                    if word.lower() in raw_trans.lower():
+                        import re
+                        raw_trans = re.sub(f"({re.escape(word)})", r"**\1**", raw_trans, flags=re.IGNORECASE)
+                st.markdown(raw_trans)
 with tab2:
     st.subheader("📂 批量威脅鑑定中心")
     
