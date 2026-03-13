@@ -52,6 +52,8 @@ def analyze_scam(text, platform):
             display_text = f"【偵測語言：英文】\n--- 原始文本 ---\n{text}"
     except: trans = text
     display_text = text
+
+    t_low = trans.lower()
     
     reasons = []
     current_score = 0  # 🌟 關鍵修正：先初始化變數，避免 UnboundLocalError
