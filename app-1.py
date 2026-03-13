@@ -221,7 +221,7 @@ with tab1:
 
             # 2. 原本的鑑定報告內容
             st.subheader("🕵️ 鑑定報告")
-            st.metric("Scam Probability", f"{s:.2f}%", delta="🚨 HIGH" if s > 70 else "🟢 SAFE")
+            
             # 建議將 delta 設為警告字樣，或者直接拿掉 delta 避免混淆
             st.metric(
                 "Scam Probability", 
