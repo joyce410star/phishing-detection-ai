@@ -67,24 +67,30 @@ def analyze_scam(text, platform):
     # A. 關鍵字加權
     # 找到 analyze_scam 函式中的加權部分並修改：
 
-    # A. 關鍵字加權
-    hits = [w for w in p_weights[platform] if w in t_low or w in text]
-    if hits:
-        w = 15 * len(set(hits))
-        final_score += (w / 100)
-        reasons.append(f"關鍵詞命中：{', '.join(list(set(hits)))} (+{w}%)")
+    # --- 優化後的加權邏輯 (避免分數暴走) ---
     
-    # B. 附件偵測
+    # 1. 關鍵字遞減加權 (不再是死板的 15% * n)
+    hits = [w for w in p_weights[platform] if w in t_low or w in text]
+    rule_bonus = 0
+    if hits:
+        unique_hits = list(set(hits))
+        # 第一個字加 10%，之後每個字加 3%，總上限 25%
+        rule_bonus = 10 + (len(unique_hits) - 1) * 3
+        rule_bonus = min(25, rule_bonus) 
+        
+        final_score += (rule_bonus / 100)
+        reasons.append(f"命中風險關鍵詞組合 (+{rule_bonus}%)")
+
+    # 2. 只有在真的有附件或連結時，才給予高額加權
     if attachments:
         final_score += 0.2
-        reasons.append(f"可疑附件偵測：*.{attachments[0]} (+20%)")
+        reasons.append(f"偵測到可疑附件檔案 (*.{attachments[0]}) (+20%)")
         
-    # C. 連結偵測
     if links:
         final_score += 0.15
-        reasons.append(f"惡意連結指向偵測 (+15%)")
+        reasons.append(f"包含外部導引連結 (+15%)")
         
-    # D. 緊急壓力偵測
+    # 3. 緊急壓力維持加 10%
     if any(w in t_low for w in ["immediately", "3 days", "urgent", "立即", "三日內", "趕快"]):
         final_score += 0.1
         reasons.append("要求在限時內完成行動 (Urgency) (+10%)")
@@ -186,7 +192,9 @@ with tab1:
                     # 使用 split 取出 (+ 之前的文字，讓結論變乾淨
                     clean_reason = r.split(' (+')[0] if ' (+' in r else r
                     st.markdown(f"* {clean_reason}")
-            else:
+            if raw_ai_score > 60 and not full_reasons:
+                st.markdown("* 🤖 **AI 語意模型偵測到與已知詐騙郵件高度相似的語氣與模式。**")
+            elif not full_reasons:
                 st.write("🟢 未偵測到顯著風險特徵。")
 
             # 顯示判定類型
