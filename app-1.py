@@ -118,8 +118,9 @@ def analyze_scam(text, platform):
         scam_type = "帳據安全威脅"
     
     return {
-        "final_score": min(final_score, 100.0),
-        "raw_prob": prob * 100,
+        # 🌟 這裡要把 final_score 改成 current_score
+        "final_score": min(current_score, 100.0), 
+        "raw_prob": raw_prob_val,
         "explanations": reasons,
         "trans": trans,
         "type": scam_type
