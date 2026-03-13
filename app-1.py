@@ -46,18 +46,20 @@ P_WEIGHTS = {
 
 def analyze_scam(text, platform):
     try:
-        lang = detect(text)
-        # 🌟 修改：不論是否翻譯，都記錄偵測到的語言
-        lang_name = "中文" if lang == 'zh-cn' or lang == 'zh-tw' else "英文"
-        
-        if lang != 'en':
+        detected_lang = detect(text)
+        # 如果偵測到中文 (zh-tw, zh-cn) 或非英文，強制翻譯
+        if 'zh' in detected_lang or detected_lang != 'en':
             trans = GoogleTranslator(source='auto', target='en').translate(text)
-            display_text = f"【偵測語言：{lang_name}】\n--- 翻譯結果 ---\n{trans}"
+            lang_info = f"偵測語言：{detected_lang} (已翻譯)"
         else:
             trans = text
-            display_text = f"【偵測語言：英文】\n--- 原始文本 ---\n{text}"
-    except: trans = text
-    display_text = text
+            lang_info = "偵測語言：英文 (原始)"
+            
+        # 這裡定義要傳回給前端顯示的內容
+        display_text = f"【{lang_info}】\n\n{trans}"
+    except Exception as e:
+        trans = text
+        display_text = f"【語意處理異常】\n\n{text}"
 
     t_low = trans.lower()
     
@@ -145,13 +147,12 @@ def analyze_scam(text, platform):
         scam_type = "帳據安全威脅"
     
     return {
-        # 🌟 這裡要把 final_score 改成 current_score
-        "final_score": min(current_score, 100.0), 
+        "final_score": max(0, min(current_score, 100.0)),
         "raw_prob": raw_prob_val,
         "explanations": reasons,
-        "trans":display_text,
+        "trans": display_text,  # <--- 確保這行是傳 display_text
         "type": scam_type,
-        "detected_keywords": list(set(hits))  # 🌟 加上這一行
+        "detected_keywords": list(set(hits))
     }
 # 4. 主介面
 st.title("🛡️ 智慧資安：全通路詐騙 AI 偵測系統")
@@ -266,7 +267,7 @@ with tab1:
             # 在 col_res 的 expander 區塊中修改
             with st.expander("📝 檢視語意處理結果"):
             # 取得處理過的文字
-                raw_trans = res.get("trans", "")
+                st.markdown(res.get("trans", ""))
                 
                 # 在顯示前，將關鍵字高亮 (Bold)
                 platform_keywords = P_WEIGHTS.get(platform, [])
