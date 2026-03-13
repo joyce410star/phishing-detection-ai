@@ -152,25 +152,29 @@ with tab1:
             
             st.subheader("🕵️ 鑑定報告")
             st.metric("Scam Probability", f"{s:.2f}%", delta="🚨 HIGH" if s > 70 else "🟢 SAFE")
+            # --- 🌟 決策組成分析 (垂直穩定版：取代原本的 columns) ---
             st.write("### ⚖️ 決策組成分析")
             raw_ai = res.get("raw_prob", 50)  # 取得 AI 原始分
             rule_weight = max(0, s - raw_ai)  # 計算規則加分
             
-            # 建立比例條 (使用 columns 模擬)
-            col_ai, col_rule = st.columns([raw_ai, max(5, rule_weight)])
-            with col_ai:
-                st.caption(f"🤖 AI 模型 ({raw_ai:.1f}%)")
-                st.progress(raw_ai / 100 if raw_ai <= 100 else 1.0)
-            with col_rule:
-                st.caption(f"🛡️ 專家規則 (+{rule_weight:.1f}%)")
-                st.progress(1.0 if rule_weight > 0 else 0.0)
-            # --- 1. 判斷原因 (簡潔化：去掉百分比) ---
+            # 1. 顯示 AI 模型比重
+            st.caption(f"🤖 AI 語意模型核心判定：{raw_ai:.1f}%")
+            st.progress(min(1.0, raw_ai / 100))
+            
+            # 2. 顯示專家規則加權 (只有在有加分時才顯示，視覺更精簡)
+            if rule_weight > 0:
+                st.caption(f"🛡️ 專家規則特徵加權：+{rule_weight:.1f}%")
+                st.progress(min(1.0, rule_weight / 100))
+            
+            st.write("---") # 分隔線，讓下方判斷原因更清晰
+
+            # --- 1. 判斷原因 (這部分接在下方) ---
             st.write("### 📝 判斷原因")
             full_reasons = res.get("explanations", [])
             if full_reasons:
                 for r in full_reasons:
                     # 使用 split 取出 (+ 之前的文字，讓結論變乾淨
-                    clean_reason = r.split(' (+')[0]
+                    clean_reason = r.split(' (+')[0] if ' (+' in r else r
                     st.markdown(f"* {clean_reason}")
             else:
                 st.write("🟢 未偵測到顯著風險特徵。")
