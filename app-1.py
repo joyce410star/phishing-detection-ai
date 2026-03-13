@@ -45,23 +45,24 @@ P_WEIGHTS = {
 }
 
 def analyze_scam(text, platform):
+    # 🌟 1. 強化版語意正規化 (捨棄手動判定，改用全自動翻譯)
     try:
-        detected_lang = detect(text)
-        # 如果偵測到中文 (zh-tw, zh-cn) 或非英文，強制翻譯
-        if 'zh' in detected_lang or detected_lang != 'en':
-            trans = GoogleTranslator(source='auto', target='en').translate(text)
-            lang_info = f"偵測語言：{detected_lang} (已翻譯)"
+        # 使用 source='auto' 讓 Google 自己判斷，我們不自己 detect 了
+        trans = GoogleTranslator(source='auto', target='en').translate(text)
+        
+        # 為了確認是否真的有翻譯，我們比對一下原文跟譯文
+        if trans.strip().lower() == text.strip().lower():
+            display_text = f"【系統偵測：英文/無法翻譯內容】\n\n{text}"
         else:
-            trans = text
-            lang_info = "偵測語言：英文 (原始)"
-            
-        # 這裡定義要傳回給前端顯示的內容
-        display_text = f"【{lang_info}】\n\n{trans}"
+            display_text = f"【系統偵測：非英語系 (已自動翻譯分析)】\n\n{trans}"
     except Exception as e:
         trans = text
         display_text = f"【語意處理異常】\n\n{text}"
 
+    # 🌟 2. 核心分析：後續所有邏輯 (hits, t_low) 都要用 trans！
     t_low = trans.lower()
+    
+    # ... (後面算分邏輯不變) ...
     
     reasons = []
     current_score = 0  # 🌟 關鍵修正：先初始化變數，避免 UnboundLocalError
@@ -259,7 +260,8 @@ with tab1:
             kws = res.get("detected_keywords", [])
             if kws:
                 st.write("🔍 **系統特徵提取：**")
-                kw_html = "".join([f"<span style='background:#f3f4f6; color:#374151; padding:2px 8px; border-radius:12px; margin-right:5px; font-size:0.8rem;'>#{w}</span>" for w in kws])
+                # 修改 kw_html 的背景色
+                kw_html = "".join([f"<span style='background:#E0F2FE; color:#0369A1; padding:3px 10px; border-radius:15px; margin-right:8px; font-size:0.85rem; border: 1px solid #7DD3FC;'>#{w}</span>" for w in kws])
                 st.markdown(kw_html, unsafe_allow_html=True)
                 st.write("") 
 
