@@ -45,22 +45,28 @@ P_WEIGHTS = {
 }
 
 def analyze_scam(text, platform):
-    # 🌟 1. 強化版語意正規化 (捨棄手動判定，改用全自動翻譯)
+    # 🌟 1. 強制語意正規化 (確保翻譯)
     try:
-        # 使用 source='auto' 讓 Google 自己判斷，我們不自己 detect 了
+        # 強制使用 Google Translator 轉成英文
+        # 我們不再比對 text，而是直接使用 trans
         trans = GoogleTranslator(source='auto', target='en').translate(text)
         
-        # 為了確認是否真的有翻譯，我們比對一下原文跟譯文
-        if trans.strip().lower() == text.strip().lower():
-            display_text = f"【系統偵測：英文/無法翻譯內容】\n\n{text}"
+        # 建立顯示內容：標註偵測到的狀態
+        # 如果翻譯後的內容跟原文不一樣，代表翻譯成功
+        if trans.strip().lower() != text.strip().lower():
+            display_text = f"【語意分析：偵測為非英語內容，已完成正規化翻譯】\n\n{trans}"
         else:
-            display_text = f"【系統偵測：非英語系 (已自動翻譯分析)】\n\n{trans}"
+            display_text = f"【語意分析：偵測為英語內容，維持原始文本分析】\n\n{text}"
+            
     except Exception as e:
+        # 如果翻譯發生錯誤 (例如網路問題)
         trans = text
-        display_text = f"【語意處理異常】\n\n{text}"
+        display_text = f"【系統警告：語意處理引擎暫時異常】\n\n{text}"
 
-    # 🌟 2. 核心分析：後續所有邏輯 (hits, t_low) 都要用 trans！
+    # 🌟 2. 核心分析：後續邏輯必須用 trans 
     t_low = trans.lower()
+    
+    # ... (後面算分邏輯 hits, rule_bonus 等請保持不變) ...
     
     # ... (後面算分邏輯不變) ...
     
