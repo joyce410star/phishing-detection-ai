@@ -101,6 +101,7 @@ def analyze_scam(text, platform):
 
     return {
         "final_score": min(final_score, 1.0) * 100,
+        "raw_prob": prob * 100,  # 🌟 記得加這一行，把原始 AI 分數傳出來
         "explanations": reasons,
         "trans": trans,
         "type": scam_type
@@ -151,7 +152,18 @@ with tab1:
             
             st.subheader("🕵️ 鑑定報告")
             st.metric("Scam Probability", f"{s:.2f}%", delta="🚨 HIGH" if s > 70 else "🟢 SAFE")
+            st.write("### ⚖️ 決策組成分析")
+            raw_ai = res.get("raw_prob", 50)  # 取得 AI 原始分
+            rule_weight = max(0, s - raw_ai)  # 計算規則加分
             
+            # 建立比例條 (使用 columns 模擬)
+            col_ai, col_rule = st.columns([raw_ai, max(5, rule_weight)])
+            with col_ai:
+                st.caption(f"🤖 AI 模型 ({raw_ai:.1f}%)")
+                st.progress(raw_ai / 100 if raw_ai <= 100 else 1.0)
+            with col_rule:
+                st.caption(f"🛡️ 專家規則 (+{rule_weight:.1f}%)")
+                st.progress(1.0 if rule_weight > 0 else 0.0)
             # --- 1. 判斷原因 (簡潔化：去掉百分比) ---
             st.write("### 📝 判斷原因")
             full_reasons = res.get("explanations", [])
@@ -178,11 +190,14 @@ with tab1:
 
             with st.expander("📝 檢視語意處理結果"):
                 st.info(res.get("trans", ""))
-            with tab2:
-                st.subheader("📂 批量威脅鑑定中心")
-                # 給予獨立 key，確保分頁切換時組件不會消失
-                up_csv = st.file_uploader("選擇上傳 CSV 檔案", type="csv", key="csv_file_up")
+with tab2:
+    st.subheader("📂 批量威脅鑑定中心")
     
+    # 🌟 關鍵修復：先初始化變數，避免 NameError
+    up_csv = None 
+    
+    # 然後才進行文件上傳
+    up_csv = st.file_uploader("選擇上傳 CSV 檔案", type="csv", key="csv_file_uploader")
     if up_csv:
         df_b = pd.read_csv(up_csv)
         # 讓使用者選擇批次數據的來源平台
