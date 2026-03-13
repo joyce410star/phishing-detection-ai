@@ -56,12 +56,10 @@ def analyze_scam(text, platform):
     
     # 2. 結構化偵測
     links = re.findall(r'https?://([a-zA-Z0-9.-]+)', text)
-    # 偵測常見惡意附件副檔名
     attachments = re.findall(r'\.(zip|exe|pdf|html|rar)', t_low)
     
     # 3. AI 原始分
-    prob = ai_model.predict_proba(tfidf_vec.transform([trans]))[0][1]
-    final_score = prob
+    raw_prob_val = ai_model.predict_proba(tfidf_vec.transform([trans]))[0][1] * 100
     
     # --- 關鍵：將判斷理由與加權掛鉤 ---
     # A. 關鍵字加權
@@ -73,27 +71,30 @@ def analyze_scam(text, platform):
     hits = [w for w in p_weights[platform] if w in t_low or w in text]
     rule_bonus = 0
     if hits:
-        unique_hits = list(set(hits))
-        # 第一個字加 10%，之後每個字加 3%，總上限 25%
-        rule_bonus = 10 + (len(unique_hits) - 1) * 3
-        rule_bonus = min(25, rule_bonus) 
-        
-        final_score += (rule_bonus / 100)
+        u_hits = list(set(hits))
+        rule_bonus = 10 + (len(u_hits) - 1) * 3
+        rule_bonus = min(25, rule_bonus)
+    
+    current_score = raw_prob_val + rule_bonus
+    if hits:
         reasons.append(f"命中風險關鍵詞組合 (+{rule_bonus}%)")
 
-    # 2. 只有在真的有附件或連結時，才給予高額加權
+    # B. 偵測加權 (0-100 單位)
     if attachments:
-        final_score += 0.2
+        current_score += 20
         reasons.append(f"偵測到可疑附件檔案 (*.{attachments[0]}) (+20%)")
-        
     if links:
-        final_score += 0.15
+        current_score += 15
         reasons.append(f"包含外部導引連結 (+15%)")
-        
-    # 3. 緊急壓力維持加 10%
     if any(w in t_low for w in ["immediately", "3 days", "urgent", "立即", "三日內", "趕快"]):
-        final_score += 0.1
+        current_score += 10
         reasons.append("要求在限時內完成行動 (Urgency) (+10%)")
+
+    # --- 🌟 核心：修正 80% 封頂邏輯 ---
+    if not links and not attachments:
+        if current_score > 80:
+            current_score = 80.0
+            reasons.insert(0, "⚠️ 未發現立即性惡意載體 (如連結/附件)，風險評等受限。")
         
     
     # 4. 判定類型
@@ -115,13 +116,7 @@ def analyze_scam(text, platform):
     # D. 針對帳號安全 (針對你目前的測試內容)
     elif any(w in t_low for w in ["suspended", "verify", "security", "login", "安全", "驗證", "凍結"]):
         scam_type = "帳據安全威脅"
-    # --- 🌟 核心修正：動態上限控制 (加在 return 之前) ---
-    # 如果這封信「沒網址」且「沒附件」，就算語氣再像詐騙，最高也只給 80 分
-    if not links and not attachments:
-        if final_score > 80:
-            final_score = 80.0
-            # 在理由清單最前面加入說明，增加專業感
-            reasons.insert(0, "⚠️ 內容具備詐騙特徵，但未發現立即性惡意載體 (如連結/附件)，降低風險評等。")
+    
     return {
         "final_score": min(final_score, 100.0),
         "raw_prob": prob * 100,
