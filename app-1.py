@@ -91,10 +91,24 @@ def analyze_scam(text, platform):
         
     
     # 4. 判定類型
+    # --- 4. 判定類型 (取代原本那段) ---
     scam_type = "一般威脅"
-    if any(w in t_low for w in ["invoice", "payment", "overdue"]): scam_type = "帳務/發票詐騙"
-    elif any(w in t_low for w in ["investment", "profit"]): scam_type = "投資詐騙"
-
+    
+    # A. 針對帳務/發票
+    if any(w in t_low for w in ["invoice", "payment", "overdue", "發票", "帳單", "欠費"]):
+        scam_type = "帳務/發票詐騙"
+    
+    # B. 針對投資/獲利
+    elif any(w in t_low for w in ["investment", "profit", "teacher", "飆股", "獲利", "群組"]):
+        scam_type = "投資詐騙"
+    
+    # C. 針對包裹/簡訊
+    elif any(w in t_low for w in ["package", "delivery", "包裹", "宅配", "超商"]):
+        scam_type = "包裹/物流詐騙"
+        
+    # D. 針對帳號安全 (針對你目前的測試內容)
+    elif any(w in t_low for w in ["suspended", "verify", "security", "login", "安全", "驗證", "凍結"]):
+        scam_type = "帳據安全威脅"
     return {
         "final_score": min(final_score, 1.0) * 100,
         "raw_prob": prob * 100,  # 🌟 記得加這一行，把原始 AI 分數傳出來
@@ -176,8 +190,15 @@ with tab1:
                 st.write("🟢 未偵測到顯著風險特徵。")
 
             # 顯示判定類型
+            # 找到顯示判定類型標籤的地方，改成這樣：
             s_type = res.get("type", "一般威脅")
-            st.markdown(f"**判定類型：** <span class='platform-tag' style='background:#3b82f6'>{s_type}</span>", unsafe_allow_html=True)
+            
+            # 根據名稱給顏色：投資(紫), 帳務(橘), 安全(紅), 其他(藍)
+            t_color = "#9333ea" if "投資" in s_type else \
+                    ("#f97316" if "帳務" in s_type else \
+                    ("#ef4444" if "安全" in s_type else "#3b82f6"))
+
+            st.markdown(f"**判定類型：** <span class='platform-tag' style='background:{t_color}'>{s_type}</span>", unsafe_allow_html=True)
 
             # --- 2. AI 可解釋性分析 (XAI) (專業化：保留百分比) ---
             st.write("### 🧠 AI 可解釋性分析 (XAI)")
