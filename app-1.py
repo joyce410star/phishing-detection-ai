@@ -222,7 +222,13 @@ with tab1:
             # 2. 原本的鑑定報告內容
             st.subheader("🕵️ 鑑定報告")
             st.metric("Scam Probability", f"{s:.2f}%", delta="🚨 HIGH" if s > 70 else "🟢 SAFE")
-            
+            # 建議將 delta 設為警告字樣，或者直接拿掉 delta 避免混淆
+            st.metric(
+                "Scam Probability", 
+                f"{s:.2f}%", 
+                delta="⚠️ RISK DETECTED" if s > 40 else "🟢 LOW RISK",
+                delta_color="inverse" if s > 40 else "normal"
+            )
             # ... 接續後面的顯示邏輯 ...
             # --- 🌟 決策組成分析 (垂直穩定版：取代原本的 columns) ---
             st.write("### ⚖️ 決策組成分析")
